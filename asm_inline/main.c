@@ -27,7 +27,29 @@ void *tls_setup() {
   return (void *)addr;
 }
 
-void checkpoint_dword(int8_t *int_ptr, int64_t offset) {
+bool is_overlapping(int new_offset, int* offsets, int count) {
+    for (int i = 0; i < count; i++) {
+        if (new_offset >= offsets[i] && new_offset < offsets[i] + 8) {
+            return true;
+        }
+        if (offsets[i] >= new_offset && offsets[i] < new_offset + 8) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void generate_non_overlapping_offsets(int* offsets, int numberOfWrites, int area_size) {
+    for (int i = 0; i < numberOfWrites; i++) {
+        int new_offset;
+        do {
+            new_offset = rand() % (area_size - 8 + 1);
+        } while (is_overlapping(new_offset, offsets, i));
+        offsets[i] = new_offset;
+    }
+}
+
+void checkpoint_dword(int8_t *int_ptr, int offset) {
   int_ptr += offset;
 
   __asm__ __inline__("mov %%rax, %%gs:0;"
@@ -78,43 +100,40 @@ void checkpoint_dword(int8_t *int_ptr, int64_t offset) {
 }
 
 /* Initialize the area at the generated offset with the given value */
-void init_area(int seed, int8_t *area, int64_t init_value, int numberOfWrites) {
+void init_area(int8_t *area, int64_t init_value, int numberOfWrites, int* offsets) {
   int offset;
-  srand(seed);
   DEBUG printf("Init Memory with %ld\n", init_value);
-  DEBUG printf("Writing at ");
   for (int i = 0; i < numberOfWrites; i++) {
-    offset = rand() % (4091 - 0 + 1) + 0;
-    DEBUG printf("%d, ", offset);
-    *(area + offset) = init_value;
+    offset = offsets[i];
+    *(int64_t *)(area + offset) = init_value;
+    DEBUG printf("Writing %ld at %d\n", *(int64_t *)(area + offset), offset);
   }
-  DEBUG printf("\n");
 }
 
 /* Save original values and set the bitmap bit before writing the new value */
-void test_checkpoint(int seed, int8_t *area, int64_t new_value,
-                     int numberOfWrites) {
+void test_checkpoint(int8_t *area, int64_t new_value,
+                     int numberOfWrites, int *offsets) {
   int offset;
-  srand(seed);
   DEBUG printf("Set new value (%ld) and start checkpoint operations\n",
                new_value);
-  DEBUG printf("Writing at ");
   for (int i = 0; i < numberOfWrites; i++) {
-    offset = rand() % (4091 - 0 + 1) + 0;
-    DEBUG printf("%d, ", offset);
+    offset = offsets[i];
     checkpoint_dword(area, offset);
-    *(area + offset) = new_value;
+    *(int64_t *)(area + offset) = new_value;
+    DEBUG printf("Writing %ld at %d\n", *(int64_t *)(area + offset), offset);
   }
-  DEBUG printf("\n");
 }
 
 /* Check if the area at the generated offset contains the given value */
-int check_area(int seed, int8_t *area, int8_t value, int numberOfWrites) {
+int check_area(int8_t *area, int64_t value, int numberOfWrites, int* offsets) {
   int offset;
-  srand(seed);
   for (int i = 0; i < numberOfWrites; i++) {
-    offset = rand() % (4091 - 0 + 1) + 0;
-    if (*(area + offset) != value) {
+    offset = offsets[i];
+    if (*(int64_t *)(area + offset) != value) {
+      DEBUG fprintf(
+          stderr,
+          "Value at offset %d does not match: expected %ld, actual %ld\n",
+          offset, value, *(int64_t *)(area + offset));
       return -1;
     }
   }
@@ -122,21 +141,18 @@ int check_area(int seed, int8_t *area, int8_t value, int numberOfWrites) {
 }
 
 /* Check if the bits are set */
-int check_bitmap(int seed, int16_t *area, int numberOfWrites) {
+int check_bitmap(int16_t *area, int numberOfWrites, int* offsets) {
   int offset, word_offset, bit_index;
   bool aligned;
-  srand(seed);
   for (int i = 0; i < numberOfWrites; i++) {
-    offset = rand() % (4091 - 0 + 1) + 0;
-    DEBUG printf("offset: %d\n", offset);
+    offset = offsets[i];
     aligned = (offset % 8) == 0;
     offset -= offset % 8;
   not_aligned:
     word_offset = offset >> 7;
-    DEBUG printf("word_offset: %d\n", word_offset);
     bit_index = (offset >> 3) & 15;
-    DEBUG printf("bit_index: %d\n", bit_index);
     if (!((1 << bit_index) & *(area + word_offset))) {
+      DEBUG fprintf(stderr, "Bit for offset %d not set. (word offset %d, bit index %d)\n", offset, word_offset, bit_index);
       return -1;
     }
     if (!aligned) {
@@ -171,9 +187,9 @@ int main(int argc, char *argv[]) {
 
   // Convert and validate numberOfWrites
   numberOfWrites = strtol(argv[2], &endptr, 10);
-  if (*endptr != '\0' || numberOfWrites <= 0) {
+  if (*endptr != '\0' || (numberOfWrites <= 0 && numberOfWrites <= 512)) {
     fprintf(stderr,
-            "Number of writes must be an integer between 1 and 2048.\n");
+            "Number of writes must be an integer between 1 and 512.\n");
     return EXIT_FAILURE;
   }
 
@@ -201,39 +217,51 @@ int main(int argc, char *argv[]) {
     printf("BaseM: %p\n", area + 8192);
   }
 
-  init_area(seed, area, init_value, numberOfWrites);
+  int offsets[numberOfWrites];
 
-  if (check_area(seed, area, init_value, numberOfWrites)) {
+  generate_non_overlapping_offsets(offsets, numberOfWrites, 4096);
+
+  init_area(area, init_value, numberOfWrites, offsets);
+
+  if (check_area(area, init_value, numberOfWrites, offsets)) {
+    fprintf(stderr, "Init area check failed\n");
     return EXIT_FAILURE;
   }
 
-  test_checkpoint(seed, area, first_value, numberOfWrites);
+  test_checkpoint(area, first_value, numberOfWrites, offsets);
 
-  if (check_area(seed, area, first_value, numberOfWrites)) {
+  if (check_area(area, first_value, numberOfWrites, offsets)) {
+    fprintf(stderr, "A area first value check failed\n");
     return EXIT_FAILURE;
   }
 
-  if (check_area(seed, area + 4096, init_value, numberOfWrites)) {
+  if (check_area(area + 4096, init_value, numberOfWrites, offsets)) {
+    fprintf(stderr, "S area init value check failed\n");
     return EXIT_FAILURE;
   }
 
-  if (check_bitmap(seed, (int16_t *)(area + 8192), numberOfWrites)) {
+  if (check_bitmap((int16_t *)(area + 8192), numberOfWrites, offsets)) {
+    fprintf(stderr, "Bitmap check failed\n");
     return EXIT_FAILURE;
   }
 
-  test_checkpoint(seed, area, second_value, numberOfWrites);
+  test_checkpoint(area, second_value, numberOfWrites, offsets);
 
-  if (check_area(seed, area, second_value, numberOfWrites)) {
+  if (check_area(area, second_value, numberOfWrites, offsets)) {
+    fprintf(stderr, "A area second value check failed\n");
     return EXIT_FAILURE;
   }
 
-  if (check_area(seed, area + 4096, init_value, numberOfWrites)) {
+  if (check_area(area + 4096, init_value, numberOfWrites, offsets)) {
+    fprintf(stderr, "S area init value check failed\n");
     return EXIT_FAILURE;
   }
 
-  if (check_bitmap(seed, (int16_t *)(area + 8192), numberOfWrites)) {
+  if (check_bitmap((int16_t *)(area + 8192), numberOfWrites, offsets)) {
+    fprintf(stderr, "Bitmap check failed\n");
     return EXIT_FAILURE;
   }
 
+  printf("Test Passed\n");
   return EXIT_SUCCESS;
 }
