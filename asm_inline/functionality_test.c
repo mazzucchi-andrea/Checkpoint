@@ -30,8 +30,8 @@ void *tls_setup() {
 void checkpoint_dword(int8_t *int_ptr, int offset) {
   int_ptr += offset;
 
-  __asm__ __inline__("mov %%rax, %%gs:0;"
-                     "mov %0, %%rax;"
+  __asm__ __inline__("mov %0, %%rax;"
+                     "mov %%rax, %%gs:0;" 
                      "mov %%rbx, %%gs:8;"
                      "mov %%rcx, %%gs:16;"
                      "mov %%rax, %%rcx;"
