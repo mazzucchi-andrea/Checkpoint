@@ -8,11 +8,13 @@ permissions: write-all
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: ./asm_inline
     steps:
       - uses: actions/checkout@v4
-      - name: Set working directory
-        run: cd asm_inline
       - name: Run All Tests
-        run: make
+        run: make all
       - name: Clean
         run: make clean
