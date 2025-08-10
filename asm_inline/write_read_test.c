@@ -133,6 +133,8 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "Seed must be a positive integer.\n");
     return EXIT_FAILURE;
   }
+  DEBUG printf("Seed: %d\n", seed);
+  srand(seed);
 
   // Convert and validate numberOfOps
   numberOfOps = strtol(argv[2], &endptr, 10);
@@ -162,7 +164,6 @@ int main(int argc, char *argv[]) {
     printf("BaseM: %p\n", area + 8192);
   }
 
-  srand(42);
   if (CHECKPOINT) {
     test_checkpoint(area, new_value, numberOfOps, writePercentage);
   } else {
