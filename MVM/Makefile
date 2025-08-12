@@ -11,7 +11,6 @@ TARGET_MODULES= prog.c
 TARGET_FUNCTIONS="<test_checkpoint>"
 LIBS =
 
-
 INCLUDE = $(PWD)/include
 OBJ = $(PWD)/obj
 LIB = $(PWD)/lib
@@ -57,6 +56,8 @@ checks:
 	@if [ -d $(APP) ]; then echo ""; else echo "application directory does not exist" ; exit 1; fi
 	@./scripts/file-existence $(APP) $(TARGET_MODULES)
 	@echo "PLEASE for any compiling error run 'make restore-files'\n"
+
+	@if [ ! -d $(OBJ) ]; then mkdir -p $(OBJ); fi
 
 base:
 	./scripts/temp-dir.sh $(TEMP) $(TEMP)/$(INTERMEDIATEFILE)
