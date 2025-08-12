@@ -38,45 +38,45 @@ the_patch_assembly:
         popq %rdx //index 13
         popq %rsi
         popq %rdi
-        mov %rdx, %gs:0
-        mov %rbx, %gs:8
-        mov %rcx, %gs:16
-        mov %rdx,%rcx
+        movq %rdx, %gs:0
+        movq %rbx, %gs:8
+        movq %rcx, %gs:16
+        movq %rdx,%rcx
         and $0xfffffffffffff000,%rcx
         and $0xfff,%rdx
         test $0x7,%rdx
         jz second_qword
         and $0x000000000000fff8,%rdx
         shr $0x3, %rdx
-        mov %rdx, %rbx
+        movq %rdx, %rbx
         and $0xf, %bx
         shr $0x4, %rdx
         bts %bx, 8192(%rcx, %rdx, 2)
         jc next_qword
         shl $4, %rdx
         add %rbx, %rdx
-        mov (%rcx, %rdx, 8), %rbx
-        mov %rbx, 4096(%rcx, %rdx, 8)
+        movq (%rcx, %rdx, 8), %rbx
+        movq %rbx, 4096(%rcx, %rdx, 8)
 next_qword:
-        mov %gs:0, %rdx
+        movq %gs:0, %rdx
         and $0xFF8, %rdx
         add $8, %rdx
         cmp $4096, %rdx
         jge end_checkpoint
 second_qword:
         shr $3, %rdx
-        mov %rdx, %rbx
+        movq %rdx, %rbx
         and $15, %rbx
         shr $4, %rdx
         bts %bx, 8192(%rcx, %rdx, 2)
         jc end_checkpoint
         shl $4, %rdx
         add %rbx, %rdx
-        mov (%rcx, %rdx, 8), %rbx
-        mov %rbx, 4096(%rcx, %rdx, 8)
+        movq (%rcx, %rdx, 8), %rbx
+        movq %rbx, 4096(%rcx, %rdx, 8)
 end_checkpoint:
-        mov %gs:0, %rdx
-        mov %gs:8, %rbx
-        mov %gs:16, %rcx
+        movq %gs:0, %rdx
+        movq %gs:8, %rbx
+        movq %gs:16, %rcx
 	popf
 	lea 0x1000(%rsp),%rsp

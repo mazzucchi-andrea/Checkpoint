@@ -1,0 +1,22 @@
+name: mvm 
+
+on:
+  [push]
+
+permissions: write-all
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: ./MVM
+    steps:
+      - uses: actions/checkout@v4
+      - name: Init
+        run: make all
+      - name: Test
+        run: ./application/prog 42 100
+      - name: Clean
+        run: make clean

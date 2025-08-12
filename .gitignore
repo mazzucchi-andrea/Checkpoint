@@ -56,3 +56,5 @@ dkms.conf
 
 # ide
 .vscode
+
+/MVM/application/prog
