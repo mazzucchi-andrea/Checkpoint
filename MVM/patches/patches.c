@@ -55,7 +55,7 @@ void the_patch(unsigned long mem, unsigned long regs){
 char buffer[1024];
 //in this function you get the pointer to the metedata representaion of the instruction to be instrumented
 //and the pointer to the buffer where the patch (namely the instrumenting instructions) can be placed
-//simply returning form this function with no management of the pointed areas means that you are skipping
+//simply returning from this function with no management of the pointed areas means that you are skipping
 //the instrumentatn of this instruction
 
 void user_defined(instruction_record * actual_instruction, patch * actual_patch){
