@@ -1,6 +1,7 @@
 #include <asm/prctl.h>
 
 #include <linux/limits.h>
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -9,8 +10,6 @@
 
 #include <sys/mman.h>
 #include <sys/types.h>
-
-#define DEBUG if (0)
 
 extern int arch_prctl(int code, unsigned long addr);
 
@@ -30,51 +29,52 @@ void *tls_setup() {
 }
 
 inline void checkpoint_qword(int8_t *int_ptr) {
-  __asm__ __inline__("mov %0, %%rax;"
-                     "mov %%rax, %%gs:0;"
+  __asm__ __inline__("mov %%rax, %%gs:0;"
                      "mov %%rbx, %%gs:8;"
                      "mov %%rcx, %%gs:16;"
                      "mov %%rax, %%rcx;"
-                     "and $-4096, %%rcx;"
-                     "and $0xFFF, %%rax;"
+                     "and $0xffffffffffe00000,%%rcx;"
+                     "and $0x00000000001fffff, %%rax;"
                      "test $7, %%rax;"
                      "jz second_qword;"
-                     "first_qword:"
-                     "and $-8, %%rax;"
+                     "and $0xfffffffffffffff8, %%rax;"
                      "shr $3, %%rax;"
                      "mov %%rax, %%rbx;"
                      "and $15, %%rbx;"
                      "shr $4, %%rax;"
-                     "bts %%bx, 8192(%%rcx, %%rax, 2);"
+                     "bts %%bx, 0x400000(%%rcx, %%rax, 2);"
                      "jc next_qword;"
                      "shl $4, %%rax;"
                      "add %%rbx, %%rax;"
                      "mov (%%rcx, %%rax, 8), %%rbx;"
-                     "mov %%rbx, 4096(%%rcx, %%rax, 8);"
+                     "mov %%rbx, 0x200000(%%rcx, %%rax, 8);"
+                     "jmp check_last;"
                      "next_qword:"
-                     "mov %%gs:0, %%rax;"
-                     "and $0xFF8, %%rax;"
+                     "shl $4, %%rax;"
+                     "add %%rbx, %%rax;"
+                     "check_last:"
+                     "shl $3, %%rax;"
                      "add $8, %%rax;"
-                     "cmp $4096, %%rax;"
+                     "cmp $0x200000, %%rax;"
                      "jge end;"
                      "second_qword:"
                      "shr $3, %%rax;"
                      "mov %%rax, %%rbx;"
                      "and $15, %%rbx;"
                      "shr $4, %%rax;"
-                     "bts %%bx, 8192(%%rcx, %%rax, 2);"
+                     "bts %%bx, 0x400000(%%rcx, %%rax, 2);"
                      "jc end;"
                      "shl $4, %%rax;"
                      "add %%rbx, %%rax;"
                      "mov (%%rcx, %%rax, 8), %%rbx;"
-                     "mov %%rbx, 4096(%%rcx, %%rax, 8);"
+                     "mov %%rbx, 0x200000(%%rcx, %%rax, 8);"
                      "end:"
                      "mov %%gs:0, %%rax;"
                      "mov %%gs:8, %%rbx;"
                      "mov %%gs:16, %%rcx;"
                      :
-                     : "r"(int_ptr)
-                     : "rax", "rbx", "rcx", "memory");
+                     : "a"(int_ptr)
+                     : "rbx", "rcx", "memory");
 }
 
 /* Save original values and set the bitmap bit before writing the new value */
@@ -88,9 +88,9 @@ void test_checkpoint(int8_t *area, int64_t new_value, int numberOfOps,
       *(int64_t *)(area + offset) = new_value;
     } else {
       value_read = *(int64_t *)(area + offset);
-      (void) value_read;
+      (void)value_read;
     }
-    offset = (offset + 1) % (4096 - 8);
+    offset = (offset + 1) % (0x200000 - 8);
   }
 }
 
@@ -104,9 +104,9 @@ void test_only_write(int8_t *area, int64_t new_value, int numberOfOps,
       *(int64_t *)(area + offset) = new_value;
     } else {
       value_read = *(int64_t *)(area + offset);
-      (void) value_read;
+      (void)value_read;
     }
-    offset = (offset + 1) % (4096 - 8);
+    offset = (offset + 1) % (0x200000 - 8);
   }
 }
 
@@ -133,7 +133,6 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "Seed must be a positive integer.\n");
     return EXIT_FAILURE;
   }
-  DEBUG printf("Seed: %d\n", seed);
   srand(seed);
 
   // Convert and validate numberOfOps
@@ -142,26 +141,27 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "Number of writes must be a positive integer\n");
     return EXIT_FAILURE;
   }
-  DEBUG printf("Number of Operations: %d\n", numberOfOps);
 
   // Convert and validate writePercentage
   writePercentage = atof(argv[3]);
   if (*endptr != '\0' || numberOfOps < 0 || (1 - numberOfOps) > 0.0001) {
-    fprintf(stderr, "Write Percentage must be a double between 0 and 1.0, actual %f.\n", writePercentage);
+    fprintf(stderr,
+            "Write Percentage must be a double between 0 and 1.0, actual %f.\n",
+            writePercentage);
     return EXIT_FAILURE;
   }
-  DEBUG printf("Percentage of Writes: %f\n", writePercentage);
 
   if (tls_setup() == NULL) {
     return EXIT_FAILURE;
   }
 
-  int8_t *area = mmap(NULL, 8256, PROT_READ | PROT_WRITE,
-                      MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
-  DEBUG {
-    printf("BaseA: %p\n", area);
-    printf("BaseS: %p\n", area + 4096);
-    printf("BaseM: %p\n", area + 8192);
+  unsigned long size = (1 << 21);
+  size_t alignment = 8 * (1024 * size);
+
+  int8_t *area = (int8_t *)aligned_alloc(alignment, size * 2 + 0x40000);
+  if (area == NULL) {
+    fprintf(stderr, "Cannot allocate aligned memory");
+    return EXIT_FAILURE;
   }
 
   if (CHECKPOINT) {

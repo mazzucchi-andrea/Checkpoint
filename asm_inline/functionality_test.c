@@ -1,7 +1,9 @@
 #include <asm/prctl.h>
 
 #include <linux/limits.h>
+
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,6 +15,8 @@
 #define DEBUG if (0)
 
 extern int arch_prctl(int code, unsigned long addr);
+
+void checkpoint_qword(int8_t *int_ptr, int offset);
 
 void *tls_setup() {
   unsigned long addr;
@@ -27,65 +31,67 @@ void *tls_setup() {
   return (void *)addr;
 }
 
-void checkpoint_dword(int8_t *int_ptr, int offset) {
+inline void checkpoint_qword(int8_t *int_ptr, int offset) {
   int_ptr += offset;
 
-  __asm__ __inline__("mov %0, %%rax;"
-                     "mov %%rax, %%gs:0;" 
+  __asm__ __inline__("mov %%rax, %%gs:0;"
                      "mov %%rbx, %%gs:8;"
                      "mov %%rcx, %%gs:16;"
                      "mov %%rax, %%rcx;"
-                     "and $-4096, %%rcx;"
-                     "and $0xFFF, %%rax;"
+                     "and $0xffffffffffe00000,%%rcx;"
+                     "and $0x00000000001fffff, %%rax;"
                      "test $7, %%rax;"
                      "jz second_qword;"
-                     "first_qword:"
-                     "and $-8, %%rax;"
+                     "and $0xfffffffffffffff8, %%rax;"
                      "shr $3, %%rax;"
                      "mov %%rax, %%rbx;"
                      "and $15, %%rbx;"
                      "shr $4, %%rax;"
-                     "bts %%bx, 8192(%%rcx, %%rax, 2);"
+                     "bts %%bx, 0x400000(%%rcx, %%rax, 2);"
                      "jc next_qword;"
                      "shl $4, %%rax;"
                      "add %%rbx, %%rax;"
                      "mov (%%rcx, %%rax, 8), %%rbx;"
-                     "mov %%rbx, 4096(%%rcx, %%rax, 8);"
+                     "mov %%rbx, 0x200000(%%rcx, %%rax, 8);"
+                     "jmp check_last;"
                      "next_qword:"
-                     "mov %%gs:0, %%rax;"
-                     "and $0xFF8, %%rax;"
+                     "shl $4, %%rax;"
+                     "add %%rbx, %%rax;"
+                     "check_last:"
+                     "shl $3, %%rax;"
                      "add $8, %%rax;"
-                     "cmp $4096, %%rax;"
+                     "cmp $0x200000, %%rax;"
                      "jge end;"
                      "second_qword:"
                      "shr $3, %%rax;"
                      "mov %%rax, %%rbx;"
                      "and $15, %%rbx;"
                      "shr $4, %%rax;"
-                     "bts %%bx, 8192(%%rcx, %%rax, 2);"
+                     "bts %%bx, 0x400000(%%rcx, %%rax, 2);"
                      "jc end;"
                      "shl $4, %%rax;"
                      "add %%rbx, %%rax;"
                      "mov (%%rcx, %%rax, 8), %%rbx;"
-                     "mov %%rbx, 4096(%%rcx, %%rax, 8);"
+                     "mov %%rbx, 0x200000(%%rcx, %%rax, 8);"
                      "end:"
                      "mov %%gs:0, %%rax;"
                      "mov %%gs:8, %%rbx;"
                      "mov %%gs:16, %%rcx;"
                      :
-                     : "r"(int_ptr)
-                     : "rax", "rbx", "rcx", "memory");
+                     : "a"(int_ptr)
+                     : "rbx", "rcx", "memory");
 }
 
 /* Initialize the area at the generated offset with the given value */
 void init_area(int seed, int8_t *area, int64_t init_value, int numberOfWrites) {
   int offset;
   srand(seed);
-  DEBUG printf("Init Memory with %ld\n", init_value);
+  DEBUG printf("Init Memory with 0x%lx\n", init_value);
   for (int i = 0; i < numberOfWrites; i++) {
-    offset = rand() % (4096 - 8 + 1);
+    offset = rand() % (0x200000 - 8 + 1);
+    DEBUG printf("Writing 0x%lx at 0x%x\n", *(int64_t *)(area + offset),
+                 offset);
     *(int64_t *)(area + offset) = init_value;
-    DEBUG printf("Writing %ld at %d\n", *(int64_t *)(area + offset), offset);
   }
 }
 
@@ -94,13 +100,13 @@ void test_checkpoint(int seed, int8_t *area, int64_t new_value,
                      int numberOfWrites) {
   int offset;
   srand(seed);
-  DEBUG printf("Set new value (%ld) and start checkpoint operations\n",
+  DEBUG printf("Set new value (0x%lx) and start checkpoint operations\n",
                new_value);
   for (int i = 0; i < numberOfWrites; i++) {
-    offset = rand() % (4096 - 8 + 1);
-    checkpoint_dword(area, offset);
+    offset = rand() % (0x200000 - 8 + 1);
+    DEBUG printf("Writing 0x%lx at 0x%x\n", new_value, offset);
+    checkpoint_qword(area, offset);
     *(int64_t *)(area + offset) = new_value;
-    DEBUG printf("Writing %ld at %d\n", *(int64_t *)(area + offset), offset);
   }
 }
 
@@ -110,7 +116,7 @@ int check_bitmap(int seed, int16_t *area, int numberOfWrites) {
   bool aligned;
   srand(seed);
   for (int i = 0; i < numberOfWrites; i++) {
-    offset = rand() % (4096 - 8 + 1);
+    offset = rand() % (0x200000 - 8 + 1);
     aligned = (offset % 8) == 0;
     offset -= offset % 8;
   not_aligned:
@@ -118,7 +124,8 @@ int check_bitmap(int seed, int16_t *area, int numberOfWrites) {
     bit_index = (offset >> 3) & 15;
     if (!((1 << bit_index) & *(area + word_offset))) {
       DEBUG fprintf(
-          stderr, "Bit for offset %d not set. (word offset %d, bit index %d)\n",
+          stderr,
+          "Bit for offset 0x%x not set. (word offset 0x%x, bit index 0x%x)\n",
           offset, word_offset, bit_index);
       return -1;
     }
@@ -131,7 +138,7 @@ int check_bitmap(int seed, int16_t *area, int numberOfWrites) {
   return 0;
 }
 
-/* Three parameters are needed to run the tests:
+/* Two parameters are needed to run the tests:
  * - seed: the initial value for random number generation;
  * - numberOfWrites: the number of write operations to perform;
  */
@@ -159,8 +166,8 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
 
-  printf("Seed: %d\n", seed);
-  printf("Number of Writes: %d\n", numberOfWrites);
+  printf("Seed: 0x%x\n", seed);
+  printf("Number of Writes: 0x%x\n", numberOfWrites);
 
   if (tls_setup() == NULL) {
     return EXIT_FAILURE;
@@ -169,55 +176,59 @@ int main(int argc, char *argv[]) {
   srand(seed);
 
   init_value = rand() % (0xFFFFFFFFFFFFFFFF - 1 + 1) + 1;
-  DEBUG printf("Initial Value %ld\n", init_value);
+  DEBUG printf("Initial Value 0x%lx\n", init_value);
   first_value = rand() % (0xFFFFFFFFFFFFFFFF - 1 + 1) + 1;
   second_value = rand() % (0xFFFFFFFFFFFFFFFF - 1 + 1) + 1;
-  DEBUG printf("First Value %ld\n", first_value);
-  DEBUG printf("Second Value %ld\n", second_value);
+  DEBUG printf("First Value 0x%lx\n", first_value);
+  DEBUG printf("Second Value 0x%lx\n", second_value);
 
-  int8_t *area = mmap(NULL, 8256, PROT_READ | PROT_WRITE,
-                      MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
+  unsigned long size = (1 << 21);
+  size_t alignment = 8 * (1024 * size);
+
+  int8_t *area = (int8_t *)aligned_alloc(alignment, size * 2 + 0x40000);
+  if (area == NULL) {
+    fprintf(stderr, "Cannot allocate aligned memory");
+    return EXIT_FAILURE;
+  }
   DEBUG {
     printf("BaseA: %p\n", area);
-    printf("BaseS: %p\n", area + 4096);
-    printf("BaseM: %p\n", area + 8192);
+    printf("BaseS: %p\n", area + 0x200000);
+    printf("BaseM: %p\n", area + 0x400000);
   }
 
-  init_area(seed, area, init_value, numberOfWrites);
-
-  int8_t *init_A_copy = mmap(NULL, 4096, PROT_READ | PROT_WRITE,
+  int8_t *init_A_copy = mmap(NULL, (1 << 21), PROT_READ | PROT_WRITE,
                              MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
 
-  memcpy(init_A_copy, area, 4096);
+  memcpy(init_A_copy, area, 0x200000);
 
-  ret = memcmp(area, init_A_copy, 4096);
+  ret = memcmp(area, init_A_copy, 0x200000);
   if (ret) {
-    fprintf(stderr, "Area A check failed: %d\n", ret);
+    fprintf(stderr, "Area A check failed: 0x%x\n", ret);
     return EXIT_FAILURE;
   }
 
   test_checkpoint(seed, area, first_value, numberOfWrites);
 
-  ret = memcmp(area + 4096, init_A_copy, 4096);
+  ret = memcmp(area + 0x200000, init_A_copy, 0x200000);
   if (ret) {
-    fprintf(stderr, "Area S check failed: %d\n", ret);
+    fprintf(stderr, "Area S check failed: 0x%x\n", ret);
     return EXIT_FAILURE;
   }
 
-  if (check_bitmap(seed, (int16_t *)(area + 8192), numberOfWrites)) {
+  if (check_bitmap(seed, (int16_t *)(area + 0x400000), numberOfWrites)) {
     fprintf(stderr, "Bitmap check failed\n");
     return EXIT_FAILURE;
   }
 
   test_checkpoint(seed, area, second_value, numberOfWrites);
 
-  ret = memcmp(area + 4096, init_A_copy, 4096);
+  ret = memcmp(area + 0x200000, init_A_copy, 0x200000);
   if (ret) {
-    fprintf(stderr, "Area S check failed: %d\n", ret);
+    fprintf(stderr, "Area S check failed: 0x%x\n", ret);
     return EXIT_FAILURE;
   }
 
-  if (check_bitmap(seed, (int16_t *)(area + 8192), numberOfWrites)) {
+  if (check_bitmap(seed, (int16_t *)(area + 0x400000), numberOfWrites)) {
     fprintf(stderr, "Bitmap check failed\n");
     return EXIT_FAILURE;
   }
