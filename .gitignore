@@ -56,5 +56,6 @@ dkms.conf
 
 # ide
 .vscode
+.clang-format
 
 /MVM/application/prog
