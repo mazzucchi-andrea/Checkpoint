@@ -13,6 +13,8 @@
 
 
 void user_defined(instruction_record *, patch *);
+void ckpt_patch(instruction_record *, patch *);
+void save_regs_tls(patch *);
 
 
 uint64_t asl_randomization = 0;
@@ -35,6 +37,9 @@ uint64_t intermediate_flags[SIZE];
 int intermediate_zones_index = -1;
 
 void audit_block(instruction_record *the_record){
+	if (the_record->type == 'l') {
+		return;
+	}
 	printf("instruction record:\n \
 			belonging function is %s\n \
 			address is %p\n \
@@ -81,7 +86,7 @@ void build_intermediate_representation(void){
 		patches[i].functional_instr_size = 0; 
 
 		//just passing through user-defined stuff
-		user_defined(&instructions[i], &patches[i]);
+		//user_defined(&instructions[i], &patches[i]);
 	}
 }
 
@@ -102,7 +107,6 @@ uint64_t book_intermediate_target(uint64_t instruction_address, unsigned long in
 }
 
 void build_patches(void){
-
 	int i;
 	unsigned long size;
 	uint64_t instruction_address;
@@ -117,7 +121,7 @@ void build_patches(void){
 	uint64_t intermediate_target;
 
 	uint64_t test_code = (uint64_t)the_patch_assembly;
-	int test_code_size = 0x120;	//this is taken from the compiled version of the src/_asm_patch.S file
+	int test_code_size = 0xbe;	//this is taken from the compiled version of the src/_asm_patch.S file
 
 	patches = (patch*)address1;
 
@@ -165,8 +169,25 @@ void build_patches(void){
 		memcpy((char*)(patches[i].code) + 37,v,8);
 		patches[i].code = patches[i].code + test_code_size;
 #endif
+
+#ifdef CKPT
+		memset((char*)(patches[i].code),0x90, 37 + test_code_size);
+		save_regs_tls(&patches[i]);
+		patches[i].code = patches[i].code + 27;// 27 is the size of the instructions to save the regs in gs
+		ckpt_patch(&instructions[i], &patches[i]);
+		patches[i].code = patches[i].code + 10;//10 is the mazimum size of the lea instruction
+		memcpy((char*)(patches[i].code),(char*)(test_code),test_code_size);
+		patches[i].code = patches[i].code + test_code_size;
+#endif
+
 		//copy the original memory access instruction to be executed
-		memcpy((char*)(patches[i].code),(char*)(instructions[i].address),size); 
+		memcpy((char*)(patches[i].code),(char*)(instructions[i].address),size);
+		
+#ifdef CKPT
+		//move again at the begin of the block of instructions forming the patch
+		//NOTE: you will need to have patches[i].code point again to patches[i].block before proceeding with the following if/else	
+		patches[i].code = patches[i].code - 37 - test_code_size;
+#endif
 
 #ifdef ASM_PREAMBLE
 		//move again at the begin of the block of instructions forming the patch
@@ -232,6 +253,11 @@ void build_patches(void){
 			}
 		}
 
+#ifdef CKPT 
+		//NOTE: for the below code fragment you will need to have patches[i].code point to the copy of the original instruction - you will need to step forward other preceeding instructions forming the patch
+		patches[i].code = patches[i].code + 37 + test_code_size;
+#endif
+
 #ifdef ASM_PREAMBLE
 		//NOTE: for the below code fragment you will need to have patches[i].code point to the copy of the original instruction - you will need to step forward other preceeding instructions forming the patch
 		patches[i].code = patches[i].code + test_code_size;
@@ -282,6 +308,7 @@ void apply_patches(void){
 	unsigned short instruction_short_patch;
 
 	for (i=0;i<target_instructions;i++){
+		if (instructions[i].type == 'l') continue;
 		size = instructions[i].size;
 		instruction_address = instructions[i].address;
 		AUDIT
@@ -318,7 +345,7 @@ int get_register_index(char* the_register){
 
 //this function determines the size of touched data based on the instruction source/destination
 //type is either 'l' or 's' for load/store instructions
-//it i usefull for mov instructions where data size is not explicit
+//it is usefull for mov instructions where data size is not explicit
 int operands_check(char * source, char * destination, char type){
 
 	char *reg = (type == 's') ? source : destination;
