@@ -21,8 +21,7 @@ void checkpoint_qword(int8_t *int_ptr, int offset);
 void *tls_setup() {
     unsigned long addr;
 
-    addr = (unsigned long)mmap(NULL, 64, PROT_READ | PROT_WRITE,
-                               MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
+    addr = (unsigned long)mmap(NULL, 64, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
 
     *(unsigned long *)addr = addr;
 
@@ -89,26 +88,21 @@ void init_area(int seed, int8_t *area, int64_t init_value, int numberOfWrites) {
     DEBUG printf("Init Memory with 0x%lx\n", init_value);
     for (int i = 0; i < numberOfWrites; i++) {
         offset = rand() % (0x200000 - 8 + 1);
-        DEBUG printf("Writing 0x%lx at 0x%x\n", *(int64_t *)(area + offset),
-                     offset);
+        DEBUG printf("Writing 0x%lx at 0x%x\n", *(int64_t *)(area + offset), offset);
         *(int64_t *)(area + offset) = init_value;
     }
 }
 
 void audit_values(int8_t *area, int offset) {
-    printf("Value written at 0x%x in A: 0x%lx\n", offset,
-           *(int64_t *)(area + offset));
-    printf("Value written at 0x%x in S: 0x%lx\n", offset,
-           *(int64_t *)(area + 0x200000 + offset));
+    printf("Value written at 0x%x in A: 0x%lx\n", offset, *(int64_t *)(area + offset));
+    printf("Value written at 0x%x in S: 0x%lx\n", offset, *(int64_t *)(area + 0x200000 + offset));
 }
 
 /* Save original values and set the bitmap bit before writing the new value */
-void test_checkpoint(int seed, int8_t *area, int64_t new_value,
-                     int numberOfWrites) {
+void test_checkpoint(int seed, int8_t *area, int64_t new_value, int numberOfWrites) {
     int offset;
     srand(seed);
-    DEBUG printf("Set new value (0x%lx) and start checkpoint operations\n",
-                 new_value);
+    DEBUG printf("Set new value (0x%lx) and start checkpoint operations\n", new_value);
     for (int i = 0; i < numberOfWrites; i++) {
         offset = rand() % (0x200000 - 8 + 1);
         DEBUG printf("Writing 0x%lx at 0x%x\n", new_value, offset);
@@ -131,11 +125,15 @@ int check_bitmap(int seed, int16_t *area, int numberOfWrites) {
         word_offset = offset >> 7;
         bit_index = (offset >> 3) & 15;
         if (!((1 << bit_index) & *(area + word_offset))) {
-            DEBUG fprintf(stderr,
-                          "Bit for offset 0x%x not set. (word offset 0x%x, bit "
-                          "index 0x%x)\n",
-                          offset, word_offset, bit_index);
+            fprintf(stderr,
+                    "Bit for offset 0x%x not set. (word offset 0x%x, bit "
+                    "index 0x%x)\n",
+                    offset, word_offset, bit_index);
             return -1;
+        } else {
+            DEBUG printf("Bit for offset 0x%x set. (word offset 0x%x, bit "
+                         "index 0x%x)\n",
+                         offset, word_offset, bit_index);
         }
         if (!aligned) {
             offset += 8;
@@ -170,13 +168,12 @@ int main(int argc, char *argv[]) {
     // Convert and validate numberOfWrites
     numberOfWrites = strtol(argv[2], &endptr, 10);
     if (*endptr != '\0' || (numberOfWrites <= 0 && numberOfWrites <= 512)) {
-        fprintf(stderr,
-                "Number of writes must be an integer between 1 and 512.\n");
+        fprintf(stderr, "Number of writes must be an integer between 1 and 512.\n");
         return EXIT_FAILURE;
     }
 
-    printf("Seed: 0x%x\n", seed);
-    printf("Number of Writes: 0x%x\n", numberOfWrites);
+    printf("Seed: %d\n", seed);
+    printf("Number of Writes: %d\n", numberOfWrites);
 
     if (tls_setup() == NULL) {
         return EXIT_FAILURE;
@@ -206,8 +203,7 @@ int main(int argc, char *argv[]) {
         printf("BaseM: %p\n", area + 0x400000);
     }
 
-    int8_t *init_A_copy = mmap(NULL, (1 << 21), PROT_READ | PROT_WRITE,
-                               MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
+    int8_t *init_A_copy = mmap(NULL, (1 << 21), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
 
     init_area(seed, area, init_value, numberOfWrites);
 
