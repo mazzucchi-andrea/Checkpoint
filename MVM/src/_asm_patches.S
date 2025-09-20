@@ -1,8 +1,14 @@
 .global the_patch_assembly;
+.global ckpt_assembly;
 
 .section .text;
 
+// ASM_PREAMBLE
 the_patch_assembly:
+        nop
+
+// CKPT ASM CODE
+ckpt_assembly:
 	lea -0x1000(%rsp),%rsp //this is for the stack red zone
 	pushf
         mov %rax,%rcx

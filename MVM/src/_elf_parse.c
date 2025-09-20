@@ -121,7 +121,10 @@ void build_patches(void){
 	uint64_t intermediate_target;
 
 	uint64_t test_code = (uint64_t)the_patch_assembly;
-	int test_code_size = 0xbe;	//this is taken from the compiled version of the src/_asm_patch.S file
+	int test_code_size = 0x1;	//this is taken from the compiled version of the src/_asm_patch.S file
+
+	uint64_t ckpt_code = (uint64_t)ckpt_assembly;
+	int ckpt_code_size = 0xbe;	//this is taken from the compiled version of the src/_asm_patch.S file
 
 	patches = (patch*)address1;
 
@@ -171,13 +174,13 @@ void build_patches(void){
 #endif
 
 #ifdef CKPT
-		memset((char*)(patches[i].code),0x90, 37 + test_code_size);
+		memset((char*)(patches[i].code),0x90, 37 + ckpt_code_size);
 		save_regs_tls(&patches[i]);
 		patches[i].code = patches[i].code + 27;// 27 is the size of the instructions to save the regs in gs
 		ckpt_patch(&instructions[i], &patches[i]);
 		patches[i].code = patches[i].code + 10;//10 is the mazimum size of the lea instruction
-		memcpy((char*)(patches[i].code),(char*)(test_code),test_code_size);
-		patches[i].code = patches[i].code + test_code_size;
+		memcpy((char*)(patches[i].code),(char*)(ckpt_code),ckpt_code_size);
+		patches[i].code = patches[i].code + ckpt_code_size;
 #endif
 
 		//copy the original memory access instruction to be executed
@@ -186,7 +189,7 @@ void build_patches(void){
 #ifdef CKPT
 		//move again at the begin of the block of instructions forming the patch
 		//NOTE: you will need to have patches[i].code point again to patches[i].block before proceeding with the following if/else	
-		patches[i].code = patches[i].code - 37 - test_code_size;
+		patches[i].code = patches[i].code - 37 - ckpt_code_size;
 #endif
 
 #ifdef ASM_PREAMBLE
@@ -255,7 +258,7 @@ void build_patches(void){
 
 #ifdef CKPT 
 		//NOTE: for the below code fragment you will need to have patches[i].code point to the copy of the original instruction - you will need to step forward other preceeding instructions forming the patch
-		patches[i].code = patches[i].code + 37 + test_code_size;
+		patches[i].code = patches[i].code + 37 + ckpt_code_size;
 #endif
 
 #ifdef ASM_PREAMBLE
@@ -893,7 +896,7 @@ int __wrap_main(int argc, char ** argv){
 	}
 
 	AUDIT
-	printf("patches applied - control goes to the actual program\n");
+	printf("patches applied - control goes to the actual program\n\n");
 	fflush(stdout);
 
 	return __real_main(argc,argv);

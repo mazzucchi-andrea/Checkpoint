@@ -12,171 +12,247 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 
+#include <time.h>
+
+#define SIZE 0x200000UL
+#define BITMAP_SIZE SIZE / 8
+
 extern int arch_prctl(int code, unsigned long addr);
 
 void *tls_setup() {
     unsigned long addr;
-    addr = (unsigned long)mmap(NULL, 64, PROT_READ | PROT_WRITE,
-                               MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
+    addr = (unsigned long)mmap(NULL, 64, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
     *(unsigned long *)addr = addr;
-    arch_prctl(ARCH_SET_GS, addr);
+    if (arch_prctl(ARCH_SET_GS, addr)) {
+        return NULL;
+    }
     return (void *)addr;
 }
 
-/* Initialize the area at the generated offset with the given value */
-void init_area(int seed, int8_t *area, int64_t init_value, int numberOfWrites) {
-    int offset;
-    srand(seed);
-    printf("Init Memory with 0x%lx\n", init_value);
-    for (int i = 0; i < numberOfWrites; i++) {
-        offset = rand() % (0x200000 - 8 + 1);
-        *(int64_t *)(area + offset) = init_value;
+/* Initialize the area with the given quadword */
+void init_area(int8_t *area, int64_t init_value) {
+    for (int i = 0; i < (SIZE - 8); i++) {
+        *(int64_t *)(area + i) = init_value;
     }
 }
 
-/* Save original values and set the bitmap bit before writing the new value */
-void test_checkpoint(int seed, int8_t *area, int64_t new_value,
-                     int numberOfWrites) {
+/* Save original values and set the bitmap bit before writing the new value and read */
+void test_checkpoint(int8_t *area, int64_t new_value, int numberOfWrites, int numberOfReads) {
     int offset;
-    srand(seed);
-    printf("Set new value (0x%lx)\n", new_value);
+    int64_t read_value;
+    clock_t begin, end;
+    double time_spent;
+    begin = clock();
     for (int i = 0; i < numberOfWrites; i++) {
-        offset = rand() % (0x200000 - 8 + 1);
+        offset = i % (SIZE - 8 + 1);
         *(int64_t *)(area + offset) = new_value;
     }
+    end = clock();
+
+    time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+    printf("Time spent by %d writes: %f s\n", numberOfWrites, time_spent);
+
+    begin = clock();
+    for (int i = 0; i < numberOfReads; i++) {
+        offset = i % (SIZE - 8 + 1);
+        read_value = *(int64_t *)(area + offset);
+    }
+    end = clock();
+
+    time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+    printf("Time spent by %d reads: %f s\n", numberOfReads, time_spent);
 }
 
-/* Check if the bits are set */
-int check_bitmap(int seed, int16_t *area, int numberOfWrites) {
-    int offset, word_offset, bit_index;
-    bool aligned;
-    srand(seed);
-
+void test_no_checkpoint(int8_t *area, int64_t new_value, int numberOfWrites, int numberOfReads) {
+    int offset;
+    int64_t read_value;
+    clock_t begin, end;
+    double time_spent;
+    begin = clock();
     for (int i = 0; i < numberOfWrites; i++) {
-        offset = rand() % (0x200000 - 8 + 1);
-        aligned = (offset % 8) == 0;
-        offset -= offset % 8;
-    not_aligned:
-        word_offset = offset >> 7;
-        bit_index = (offset >> 3) & 15;
-        if (!((1 << bit_index) & *(area + word_offset))) {
-            fprintf(
-                stderr,
-                "Bit for offset %d not set. (word offset %d, bit index %d)\n",
-                offset, word_offset, bit_index);
-            return -1;
+        offset = i % (SIZE - 8 + 1);
+        *(int64_t *)(area + offset) = new_value;
+    }
+    end = clock();
+
+    time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+    printf("Time spent by %d writes: %f s\n", numberOfWrites, time_spent);
+
+    begin = clock();
+    for (int i = 0; i < numberOfReads; i++) {
+        offset = i % (SIZE - 8 + 1);
+        read_value = *(int64_t *)(area + offset);
+    }
+    end = clock();
+
+    time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+    printf("Time spent by %d reads: %f s\n", numberOfReads, time_spent);
+}
+/* Verify that the set bits correspond to the correctly saved quadwords. */
+int verify_checkpoint(int8_t *area, int8_t *init_A_copy) {
+    int8_t *bitmap = area + SIZE * 2;
+    int8_t *areaS = area + SIZE;
+    int8_t *areaAcopy = init_A_copy;
+    for (int offset = 0; offset < BITMAP_SIZE; offset += 8) {
+        if (*(int64_t *)(bitmap + offset) == 0) {
+            continue;
         }
-        if (!aligned) {
-            offset += 8;
-            aligned = true;
-            goto not_aligned;
+        for (int i = 0; i < 8; i++) {
+            int8_t current_byte = bitmap[offset + i];
+            if (current_byte == 0) {
+                continue;
+            }
+
+            for (int k = 0; k < 8; k++) {
+                if ((current_byte >> k) & 1) {
+                    int target_offset = ((offset + i) * 8 + k) * 8;
+                    if (*(int64_t *)(areaAcopy + target_offset) != *(int64_t *)(areaS + target_offset)) {
+                        fprintf(stderr,
+                                "Checkpoint verufy failed:\n"
+                                "Offset 0x%x\n"
+                                "Area S value: 0x%lx\n"
+                                "Area A init Value: 0x%lx\n",
+                                offset, *(int64_t *)(areaS + target_offset), *(int64_t *)(areaAcopy + target_offset));
+                        return -1;
+                    }
+                }
+            }
         }
     }
     return 0;
 }
 
+void restore_area(int8_t *area) {
+    int8_t *bitmap = area + SIZE * 2;
+    int8_t *src = area + SIZE;
+    int8_t *dst = area;
+    for (int offset = 0; offset < BITMAP_SIZE; offset += 8) {
+        if (*(int64_t *)(bitmap + offset) == 0) {
+            continue;
+        }
+        for (int i = 0; i < 8; i++) {
+            int8_t current_byte = bitmap[offset + i];
+            if (current_byte == 0) {
+                continue;
+            }
+
+            for (int k = 0; k < 8; k++) {
+                if ((current_byte >> k) & 1) {
+                    int target_offset = ((offset + i) * 8 + k) * 8;
+                    *(int64_t *)(dst + target_offset) = *(int64_t *)(src + target_offset);
+                }
+            }
+        }
+    }
+    memset(bitmap, 0, BITMAP_SIZE);
+}
+
 /* Two parameters are needed to run the tests:
- * - seed: the initial value for random number generation;
  * - numberOfWrites: the number of write operations to perform;
+ * - numberOfReads: the number of read operations to perform;
  */
 int main(int argc, char *argv[]) {
     char *endptr;
-    int seed, numberOfWrites, ret;
+    int numberOfWrites, numberOfReads, ret;
+    clock_t begin, end;
     int64_t init_value, first_value, second_value;
 
     if (argc < 3) {
-        fprintf(stderr, "Usage: %s <seed> <numberOfWrites>\n", argv[0]);
+        fprintf(stderr, "Usage: %s <numberOfWrites> <<numberOfReads>\n", argv[0]);
         return EXIT_FAILURE;
     }
 
-    // Convert and validate seed
-    seed = strtol(argv[1], &endptr, 10);
-    if (*endptr != '\0' || seed <= 0) {
-        fprintf(stderr, "Seed must be a positive integer.\n");
+    numberOfWrites = strtol(argv[1], &endptr, 10);
+    if (*endptr != '\0' || numberOfWrites <= 0) {
+        fprintf(stderr, "Number of writes must be an integer greater or eqaul to 1.\n");
         return EXIT_FAILURE;
     }
 
-    // Convert and validate numberOfWrites
-    numberOfWrites = strtol(argv[2], &endptr, 10);
-    if (*endptr != '\0' || (numberOfWrites <= 0 && numberOfWrites <= 512)) {
-        fprintf(stderr,
-                "Number of writes must be an integer between 1 and 512.\n");
+    numberOfReads = strtol(argv[2], &endptr, 10);
+    if (*endptr != '\0' || numberOfReads < 0) {
+        fprintf(stderr, "Number of reads must be an integer greater or eqaul to 0.\n");
         return EXIT_FAILURE;
     }
 
-    printf("Seed: %d\n", seed);
     printf("Number of Writes: %d\n", numberOfWrites);
+    printf("Number of Reads: %d\n\n", numberOfReads);
 
     if (tls_setup() == NULL) {
+        fprintf(stderr, "tls_setup failed\n");
         return EXIT_FAILURE;
     }
 
-    srand(seed);
-
+    srand(42);
     init_value = rand() % (0xFFFFFFFFFFFFFFFF - 1 + 1) + 1;
     first_value = rand() % (0xFFFFFFFFFFFFFFFF - 1 + 1) + 1;
     second_value = rand() % (0xFFFFFFFFFFFFFFFF - 1 + 1) + 1;
 
     printf("Initial Value 0x%lx\n", init_value);
     printf("First Value 0x%lx\n", first_value);
-    printf("Second Value 0x%lx\n", second_value);
+    printf("Second Value 0x%lx\n\n", second_value);
 
-    unsigned long size = (1 << 21);
-    size_t alignment = 8 * (1024 * size);
-
-    int8_t *area = (int8_t *)aligned_alloc(alignment, size * 2 + 0x40000);
-    memset(area, 0, size * 2 + 0x40000);
-
+    size_t alignment = 8 * (1024 * SIZE);
+    int8_t *area = (int8_t *)aligned_alloc(alignment, SIZE * 2 + BITMAP_SIZE);
     if (area == NULL) {
-
-        fprintf(stderr, "Cannot allocate aligned memory");
+        perror("aligned_alloc failed\n");
         return EXIT_FAILURE;
-    };
+    }
+
+    memset(area, 0, SIZE * 2 + BITMAP_SIZE);
 
     printf("BaseA: %p\n", area);
-    printf("BaseS: %p\n", area + 0x200000);
-    printf("BaseM: %p\n", area + 0x400000);
+    printf("BaseS: %p\n", area + SIZE);
+    printf("BaseM: %p\n\n", area + (SIZE * 2) + BITMAP_SIZE);
 
-    init_area(seed, area, init_value, numberOfWrites);
+    init_area(area, init_value);
+    int8_t *init_A_copy = (int8_t *)mmap(NULL, SIZE, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
+    if (init_A_copy == MAP_FAILED) {
+        perror("mmap init area copy");
+        return EXIT_FAILURE;
+    }
 
-    int8_t *init_A_copy = mmap(NULL, 0x200000, PROT_READ | PROT_WRITE,
-                               MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
+    memcpy(init_A_copy, area, SIZE);
 
-    memcpy(init_A_copy, area, 0x200000);
-
-    ret = memcmp(area, init_A_copy, 0x200000);
-
+    ret = memcmp(area, init_A_copy, SIZE);
     if (ret) {
         fprintf(stderr, "Area A check failed: %d\n", ret);
         return EXIT_FAILURE;
     }
 
-    test_checkpoint(seed, area, first_value, numberOfWrites);
+    printf("Start Tests\n");
+    test_checkpoint(area, first_value, numberOfWrites, numberOfReads);
 
-    ret = memcmp(area + 0x200000, init_A_copy, 0x200000);
+    if (verify_checkpoint(area, init_A_copy)) {
+        return EXIT_FAILURE;
+    }
+
+    printf("\nRepeat writes and reads to verify the time spent on already saved areas.\n");
+    test_checkpoint(area, second_value, numberOfWrites, numberOfReads);
+
+    if (verify_checkpoint(area, init_A_copy)) {
+        return EXIT_FAILURE;
+    }
+
+    printf("\nTest Restore Function\n");
+    begin = clock();
+
+    restore_area(area);
+
+    end = clock();
+
+    double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+    printf("Time spent by restore: %f s\n", time_spent);
+
+    ret = memcmp(area, init_A_copy, SIZE);
     if (ret) {
-        fprintf(stderr, "Area S first value check failed: %d\n", ret);
+        fprintf(stderr, "Area A restore check failed: 0x%x\n", ret);
         return EXIT_FAILURE;
     }
 
-    if (check_bitmap(seed, (int16_t *)(area + 0x400000), numberOfWrites)) {
-        fprintf(stderr, "Bitmap first value check failed\n");
-        return EXIT_FAILURE;
-    }
+    printf("\nTest Passed\n");
 
-    test_checkpoint(seed, area, second_value, numberOfWrites);
-
-    ret = memcmp(area + 0x200000, init_A_copy, 0x200000);
-    if (ret) {
-        fprintf(stderr, "Area S second value check failed: %d\n", ret);
-        return EXIT_FAILURE;
-    }
-
-    if (check_bitmap(seed, (int16_t *)(area + 0x400000), numberOfWrites)) {
-        fprintf(stderr, "Bitmap first value check failed\n");
-        return EXIT_FAILURE;
-    }
-
-    printf("Test Passed\n");
+    printf("\nRepeat the writes without checkpoint to measure the overhead\n");
+    test_no_checkpoint(area, first_value, numberOfWrites, numberOfReads);
+    
     return EXIT_SUCCESS;
 }
