@@ -21,12 +21,12 @@ ckpt_assembly:
         mov %rax, %rbx
         and $15, %rbx
         shr $4, %rax
-        bts %bx, 0x400000(%rcx, %rax, 2)
+        bts %bx, (2 *CKPT_SIZE)(%rcx, %rax, 2)
         jc next_qword
         shl $4, %rax
         add %rbx, %rax
         mov (%rcx, %rax, 8), %rbx
-        mov %rbx, 0x200000(%rcx, %rax, 8)
+        mov %rbx, CKPT_SIZE(%rcx, %rax, 8)
         jmp check_last
 next_qword:
         shl $4, %rax
@@ -34,19 +34,19 @@ next_qword:
 check_last:
         shl $3, %rax
         add $8, %rax
-        cmp $0x200000, %rax
+        cmp $CKPT_SIZE, %rax
         jge end_checkpoint
 second_qword:
         shr $3, %rax
         mov %rax, %rbx
         and $15, %rbx
         shr $4, %rax
-        bts %bx, 0x400000(%rcx, %rax, 2)
+        bts %bx, (2 * CKPT_SIZE)(%rcx, %rax, 2)
         jc end_checkpoint
         shl $4, %rax
         add %rbx, %rax
         mov (%rcx, %rax, 8), %rbx
-        mov %rbx, 0x200000(%rcx, %rax, 8)
+        mov %rbx, CKPT_SIZE(%rcx, %rax, 8)
 end_checkpoint:
         mov %gs:0, %rax
         mov %gs:8, %rbx
