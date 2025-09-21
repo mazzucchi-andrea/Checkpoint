@@ -1,5 +1,7 @@
 #include <asm/prctl.h>
 
+#include <emmintrin.h> // SSE2
+
 #include <linux/limits.h>
 
 #include <immintrin.h> // For AVX2 intrinsics
@@ -15,8 +17,6 @@
 #include <sys/types.h>
 
 #include <time.h>
-
-#define DEBUG if (1)
 
 #ifndef SIZE
 #define SIZE 0x200000UL
@@ -44,52 +44,53 @@ void *tls_setup() {
 inline void checkpoint_qword(int8_t *int_ptr, int offset) {
     int_ptr += offset;
 
-    __asm__ __inline__("mov %%rax, %%gs:0;"
-                       "mov %%rbx, %%gs:8;"
-                       "mov %%rcx, %%gs:16;"
-                       "mov %%rax, %%rcx;"
-                       "and $0xffffffffffe00000,%%rcx;"
-                       "and $0x1fffff, %%rax;"
-                       "test $7, %%rax;"
-                       "jz second_qword;"
-                       "and $0x3ffff8, %%rax;"
-                       "shr $3, %%rax;"
-                       "mov %%rax, %%rbx;"
-                       "and $15, %%rbx;"
-                       "shr $4, %%rax;"
-                       "bts %%bx, " STR(2 * SIZE) "(%%rcx, %%rax, 2);"
-                       "jc next_qword;"
-                       "shl $4, %%rax;"
-                       "add %%rbx, %%rax;"
-                       "mov (%%rcx, %%rax, 8), %%rbx;"
-                       "mov %%rbx, " STR(SIZE) "(%%rcx, %%rax, 8);"
-                       "jmp check_last;"
-                       "next_qword:"
-                       "shl $4, %%rax;"
-                       "add %%rbx, %%rax;"
-                       "check_last:"
-                       "shl $3, %%rax;"
-                       "add $8, %%rax;"
-                       "cmp $" STR(SIZE) ", %%rax;"
-                       "jge end;"
-                       "second_qword:"
-                       "shr $3, %%rax;"
-                       "mov %%rax, %%rbx;"
-                       "and $15, %%rbx;"
-                       "shr $4, %%rax;"
-                       "bts %%bx, " STR(2 * SIZE) "(%%rcx, %%rax, 2);"
-                       "jc end;"
-                       "shl $4, %%rax;"
-                       "add %%rbx, %%rax;"
-                       "mov (%%rcx, %%rax, 8), %%rbx;"
-                       "mov %%rbx, " STR(SIZE) "(%%rcx, %%rax, 8);"
-                       "end:"
-                       "mov %%gs:0, %%rax;"
-                       "mov %%gs:8, %%rbx;"
-                       "mov %%gs:16, %%rcx;"
-                       :
-                       : "a"(int_ptr)
-                       : "rbx", "rcx", "memory");
+    __asm__ __inline__(
+        "mov %%rax, %%gs:0;"
+        "mov %%rbx, %%gs:8;"
+        "mov %%rcx, %%gs:16;"
+        "mov %%rax, %%rcx;"
+        "and $0xffffffffffe00000,%%rcx;"
+        "and $0x1fffff, %%rax;"
+        "test $7, %%rax;"
+        "jz second_qword;"
+        "and $0x3ffff8, %%rax;"
+        "shr $3, %%rax;"
+        "mov %%rax, %%rbx;"
+        "and $15, %%rbx;"
+        "shr $4, %%rax;"
+        "bts %%bx, " STR(2 * SIZE) "(%%rcx, %%rax, 2);"
+        "jc next_qword;"
+        "shl $4, %%rax;"
+        "add %%rbx, %%rax;"
+        "mov (%%rcx, %%rax, 8), %%rbx;"
+        "mov %%rbx, " STR(SIZE) "(%%rcx, %%rax, 8);"
+        "jmp check_last;"
+        "next_qword:"
+        "shl $4, %%rax;"
+        "add %%rbx, %%rax;"
+        "check_last:"
+        "shl $3, %%rax;"
+        "add $8, %%rax;"
+        "cmp $" STR(SIZE) ", %%rax;"
+        "jge end;"
+        "second_qword:"
+        "shr $3, %%rax;"
+        "mov %%rax, %%rbx;"
+        "and $15, %%rbx;"
+        "shr $4, %%rax;"
+        "bts %%bx, " STR(2 * SIZE) "(%%rcx, %%rax, 2);"
+        "jc end;"
+        "shl $4, %%rax;"
+        "add %%rbx, %%rax;"
+        "mov (%%rcx, %%rax, 8), %%rbx;"
+        "mov %%rbx, " STR(SIZE) "(%%rcx, %%rax, 8);"
+        "end:"
+        "mov %%gs:0, %%rax;"
+        "mov %%gs:8, %%rbx;"
+        "mov %%gs:16, %%rcx;"
+        :
+        : "a"(int_ptr)
+        : "rbx", "rcx", "memory");
 }
 
 /* Initialize the area with the given quadword */
@@ -114,7 +115,7 @@ void test_checkpoint(int8_t *area, int64_t new_value, int numberOfWrites, int nu
     end = clock();
 
     time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-    DEBUG printf("Time spent by %d writes: %f s\n", numberOfWrites, time_spent);
+    printf("Time spent by %d writes: %f s\n", numberOfWrites, time_spent);
 
     begin = clock();
     for (int i = 0; i < numberOfReads; i++) {
@@ -124,7 +125,33 @@ void test_checkpoint(int8_t *area, int64_t new_value, int numberOfWrites, int nu
     end = clock();
 
     time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-    DEBUG printf("Time spent by %d reads: %f s\n", numberOfReads, time_spent);
+    printf("Time spent by %d reads: %f s\n", numberOfReads, time_spent);
+}
+
+void test_no_checkpoint(int8_t *area, int64_t new_value, int numberOfWrites, int numberOfReads) {
+    int offset;
+    int64_t read_value;
+    clock_t begin, end;
+    double time_spent;
+    begin = clock();
+    for (int i = 0; i < numberOfWrites; i++) {
+        offset = i % (SIZE - 8 + 1);
+        *(int64_t *)(area + offset) = new_value;
+    }
+    end = clock();
+
+    time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+    printf("Time spent by %d writes: %f s\n", numberOfWrites, time_spent);
+
+    begin = clock();
+    for (int i = 0; i < numberOfReads; i++) {
+        offset = i % (SIZE - 8 + 1);
+        read_value = *(int64_t *)(area + offset);
+    }
+    end = clock();
+
+    time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+    printf("Time spent by %d reads: %f s\n", numberOfReads, time_spent);
 }
 
 /* Verify that the set bits correspond to the correctly saved quadwords. */
@@ -298,6 +325,12 @@ void restore_area_avx_16(int8_t *area) {
     memset(bitmap, 0, BITMAP_SIZE);
 }
 
+void clean_cache(int8_t *area) {
+    int cache_line_size = __builtin_cpu_supports("sse2") ? 64 : 32;
+    for (int i = 0; i < (2 * SIZE + BITMAP_SIZE); i += (cache_line_size / 8)) {
+        _mm_clflush(area + i);
+    }
+}
 
 /* Two parameters are needed to run the tests:
  * - numberOfWrites: the number of write operations to perform;
@@ -351,11 +384,9 @@ int main(int argc, char *argv[]) {
 
     memset(area, 0, SIZE * 2 + BITMAP_SIZE);
 
-    DEBUG {
-        printf("BaseA: %p\n", area);
-        printf("BaseS: %p\n", area + SIZE);
-        printf("BaseM: %p\n", area + 2 * SIZE);
-    }
+    printf("BaseA: %p\n", area);
+    printf("BaseS: %p\n", area + SIZE);
+    printf("BaseM: %p\n\n", area + 2 * SIZE);
 
     init_area(area, init_value);
     int8_t *init_A_copy = (int8_t *)mmap(NULL, SIZE, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
@@ -373,6 +404,7 @@ int main(int argc, char *argv[]) {
     }
 
     printf("Start Tests\n");
+    clean_cache(area);
     test_checkpoint(area, first_value, numberOfWrites, numberOfReads);
 
     if (verify_checkpoint(area, init_A_copy)) {
@@ -380,12 +412,14 @@ int main(int argc, char *argv[]) {
     }
 
     printf("\nRepeat writes and reads to verify the time spent on already saved areas.\n");
+    clean_cache(area);
     test_checkpoint(area, second_value, numberOfWrites, numberOfReads);
 
     if (verify_checkpoint(area, init_A_copy)) {
         return EXIT_FAILURE;
     }
 
+    clean_cache(area);
     printf("\nTest Restore Function\n");
     begin = clock();
 
@@ -419,6 +453,10 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Area A restore check failed: 0x%x\n", ret);
         return EXIT_FAILURE;
     }
+
+    printf("\nRepeat the writes without checkpoint to measure the overhead\n");
+    clean_cache(area);
+    test_no_checkpoint(area, first_value, numberOfWrites, numberOfReads);
 
     printf("\nTest Passed\n");
     return EXIT_SUCCESS;
