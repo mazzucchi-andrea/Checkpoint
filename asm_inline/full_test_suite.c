@@ -2,6 +2,8 @@
 
 #include <linux/limits.h>
 
+#include <immintrin.h> // For AVX2 intrinsics
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -16,10 +18,14 @@
 
 #define DEBUG if (1)
 
+#ifndef SIZE
 #define SIZE 0x200000UL
+#endif
+
+#define BITMAP_SIZE SIZE / 8
+
 #define STR1(x) #x
 #define STR(x) STR1(x)
-#define BITMAP_SIZE SIZE / 8
 
 extern int arch_prctl(int code, unsigned long addr);
 
@@ -156,7 +162,59 @@ int verify_checkpoint(int8_t *area, int8_t *init_A_copy) {
 }
 
 void restore_area(int8_t *area) {
-    int8_t *bitmap = area + SIZE * 2;
+    int8_t *bitmap = area + 2 * SIZE;
+    int8_t *src = area + SIZE;
+    int8_t *dst = area;
+    int target_offset;
+    for (int offset = 0; offset < BITMAP_SIZE; offset += 8) {
+        if (*(int64_t *)(bitmap + offset) == 0) {
+            continue;
+        }
+        for (int i = 0; i < 8; i += 4) {
+            if (*(int32_t *)(bitmap + offset + i) != 0) {
+                for (int j = 0; j < 4; j += 2) {
+                    if (*(int16_t *)(bitmap + offset + i + j) != 0) {
+                        for (int k = 0; k < 16; k++) {
+                            if ((1 << k) & *(int16_t *)(bitmap + offset + i + j)) {
+                                target_offset = (((offset + i + j) << 3) + k) << 3;
+                                *(int64_t *)(dst + target_offset) = *(int64_t *)(src + target_offset);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    memset(bitmap, 0, BITMAP_SIZE);
+}
+
+void restore_area_2(int8_t *area) {
+    int8_t *bitmap = area + 2 * SIZE;
+    int8_t *src = area + SIZE;
+    int8_t *dst = area;
+    for (int offset = 0; offset < BITMAP_SIZE; offset += 8) {
+        if (*(int64_t *)(bitmap + offset) == 0) {
+            continue;
+        }
+        for (int i = 0; i < 8; i += 2) {
+            int16_t current_word = *(int16_t *)(bitmap + offset + i);
+            if (current_word == 0) {
+                continue;
+            }
+            for (int k = 0; k < 16; k++) {
+                if (((current_word >> k) & 1) == 1) {
+                    int target_offset = ((offset + i) * 8 + k) * 8;
+                    // printf("Offset 0x%x. Bit 0x%x. Target Offset 0x%x.\n", offset, k, target_offset);
+                    *(int64_t *)(dst + target_offset) = *(int64_t *)(src + target_offset);
+                }
+            }
+        }
+    }
+    memset(bitmap, 0, BITMAP_SIZE);
+}
+
+void restore_area_3(int8_t *area) {
+    int8_t *bitmap = area + 2 * SIZE;
     int8_t *src = area + SIZE;
     int8_t *dst = area;
     for (int offset = 0; offset < BITMAP_SIZE; offset += 8) {
@@ -179,6 +237,67 @@ void restore_area(int8_t *area) {
     }
     memset(bitmap, 0, BITMAP_SIZE);
 }
+
+void restore_area_avx_8(int8_t *area) {
+    int8_t *bitmap = area + 2 * SIZE;
+    int8_t *src = area + SIZE;
+    int8_t *dst = area;
+
+    for (int offset = 0; offset < BITMAP_SIZE; offset += 32) {
+        __m256i bitmap_vec = _mm256_loadu_si256((__m256i *)(bitmap + offset));
+
+        if (_mm256_testz_si256(bitmap_vec, bitmap_vec)) {
+            continue;
+        }
+
+        // Use a loop for the 32 bytes to handle different bit patterns
+        for (int i = 0; i < 32; i++) {
+            int8_t current_byte = bitmap[offset + i];
+            if (current_byte == 0) {
+                continue;
+            }
+
+            for (int k = 0; k < 8; k++) {
+                if ((current_byte >> k) & 1) {
+                    int target_offset = ((offset + i) * 8 + k) * 8;
+                    *(int64_t *)(dst + target_offset) = *(int64_t *)(src + target_offset);
+                }
+            }
+        }
+    }
+    memset(bitmap, 0, BITMAP_SIZE);
+}
+
+void restore_area_avx_16(int8_t *area) {
+    int8_t *bitmap = area + 2 * SIZE;
+    int8_t *src = area + SIZE;
+    int8_t *dst = area;
+
+    for (int offset = 0; offset < BITMAP_SIZE; offset += 32) {
+        __m256i bitmap_vec = _mm256_loadu_si256((__m256i *)(bitmap + offset));
+
+        if (_mm256_testz_si256(bitmap_vec, bitmap_vec)) {
+            continue;
+        }
+
+        // Use a loop for the 32 bytes to handle different bit patterns
+        for (int i = 0; i < 32; i += 2) {
+            int16_t current_word = *(int16_t *)(bitmap + offset + i);
+            if (current_word == 0) {
+                continue;
+            }
+
+            for (int k = 0; k < 16; k++) {
+                if ((current_word >> k) & 1) {
+                    int target_offset = ((offset + i) * 8 + k) * 8;
+                    *(int64_t *)(dst + target_offset) = *(int64_t *)(src + target_offset);
+                }
+            }
+        }
+    }
+    memset(bitmap, 0, BITMAP_SIZE);
+}
+
 
 /* Two parameters are needed to run the tests:
  * - numberOfWrites: the number of write operations to perform;
@@ -270,7 +389,25 @@ int main(int argc, char *argv[]) {
     printf("\nTest Restore Function\n");
     begin = clock();
 
-    restore_area(area);
+    #if SIMPLE
+        restore_area(area);
+    #endif
+
+    #if SIMPLE2
+        restore_area_2(area);
+    #endif
+
+    #if SIMPLE3
+        restore_area_3(area);
+    #endif
+
+    #if AVX8
+        restore_area_avx_8(area);
+    #endif
+
+    #if AVX16
+        restore_area_avx_16(area);
+    #endif
 
     end = clock();
 

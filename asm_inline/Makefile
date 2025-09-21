@@ -1,36 +1,32 @@
 SHELL := /bin/bash
+SIZE = 0x200000
 WRITES = 10000000
 READS = 0
 
-all: restore
-	gcc full_test_suite.c -o test.out
-	@echo Full Test Suite 
+all: 
+	gcc -mavx full_test_suite.c -o test.out -DSIMPLE
+	@echo Full Test Suite with SIMPLE restore
 	./test.out $(WRITES) $(READS)
-
-restore:
-	gcc -mavx restore_test.c -o rest.out -DSIMPLE
-	@echo Restore Test SIMPLE	
-	./rest.out $(WRITES)
-	@echo
- 
-	gcc -mavx restore_test.c -o rest.out -DSIMPLE2
-	@echo Restore Test SIMPLE 2
-	./rest.out $(WRITES)
 	@echo
 
-	gcc -mavx restore_test.c -o rest.out -DSIMPLE3
-	@echo Restore Test SIMPLE 3
-	./rest.out $(WRITES)
+	gcc -mavx full_test_suite.c -o test.out -DSIMPLE2
+	@echo Full Test Suite with SIMPLE2 restore
+	./test.out $(WRITES) $(READS)
 	@echo
 
-	gcc -mavx restore_test.c -o rest.out -DAVX8
-	@echo Restore Test AVX8	
-	./rest.out $(WRITES)
+	gcc -mavx full_test_suite.c -o test.out -DSIMPLE3
+	@echo Full Test Suite with SIMPLE3 restore
+	./test.out $(WRITES) $(READS)
 	@echo
 
-	gcc -mavx restore_test.c -o rest.out -DAVX16
-	@echo Restore Test AVX16	
-	./rest.out $(WRITES)
+	gcc -mavx full_test_suite.c -o test.out -DAVX8
+	@echo Full Test Suite with AVX8 restore
+	./test.out $(WRITES) $(READS)
+	@echo
+
+	gcc -mavx full_test_suite.c -o test.out -DAVX16
+	@echo Full Test Suite with AVX16 restore
+	./test.out $(WRITES) $(READS)
 	@echo
 	
 clean:
