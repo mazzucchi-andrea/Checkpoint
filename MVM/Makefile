@@ -35,7 +35,7 @@ UDTEMPOBJ = -Duser_defined_temp_obj_file=\"$(USER_DEFINED)/$(USER_DEFINED_OBJ_FI
 
 SECURITY_FLAGS = -pie -fPIE -fstack-protector-all
 
-ADDITIONAL_FLAGS = -O3 -DCKPT -DAPPLY_PATCHES -DVERBOSE -DCKPT_SIZE=0x200000
+ADDITIONAL_FLAGS = -O3 -DCKPT -DAPPLY_PATCHES -DVERBOSE -DALLOCATOR_AREA_SIZE=0x200000
 #NOTE: 
 #the ASM_PREAMBLE macro enables building a demo patch for each memory access instruction
 #which passess control to a trampoline that calls the the_patch(...) fuction

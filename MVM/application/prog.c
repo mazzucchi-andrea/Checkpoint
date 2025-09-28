@@ -16,11 +16,11 @@
 
 #include <time.h>
 
-#ifndef CKPT_SIZE
-#define CKPT_SIZE 0x200000UL
+#ifndef ALLOCATOR_AREA_SIZE
+#define ALLOCATOR_AREA_SIZE 0x200000UL
 #endif
 
-#define BITMAP_SIZE CKPT_SIZE / 8
+#define BITMAP_SIZE ALLOCATOR_AREA_SIZE / 8
 
 extern int arch_prctl(int code, unsigned long addr);
 
@@ -36,7 +36,7 @@ void *tls_setup() {
 
 /* Initialize the area with the given quadword */
 void init_area(int8_t *area, int64_t init_value) {
-    for (int i = 0; i < (CKPT_SIZE - 8); i++) {
+    for (int i = 0; i < (ALLOCATOR_AREA_SIZE - 8); i++) {
         *(int64_t *)(area + i) = init_value;
     }
 }
@@ -49,7 +49,7 @@ void test_checkpoint(int8_t *area, int64_t new_value, int numberOfWrites, int nu
     double time_spent;
     begin = clock();
     for (int i = 0; i < numberOfWrites; i++) {
-        offset = i % (CKPT_SIZE - 8 + 1);
+        offset = i % (ALLOCATOR_AREA_SIZE - 8 + 1);
         *(int64_t *)(area + offset) = new_value;
     }
     end = clock();
@@ -59,7 +59,7 @@ void test_checkpoint(int8_t *area, int64_t new_value, int numberOfWrites, int nu
 
     begin = clock();
     for (int i = 0; i < numberOfReads; i++) {
-        offset = i % (CKPT_SIZE - 8 + 1);
+        offset = i % (ALLOCATOR_AREA_SIZE - 8 + 1);
         read_value = *(int64_t *)(area + offset);
     }
     end = clock();
@@ -75,7 +75,7 @@ void test_no_checkpoint(int8_t *area, int64_t new_value, int numberOfWrites, int
     double time_spent;
     begin = clock();
     for (int i = 0; i < numberOfWrites; i++) {
-        offset = i % (CKPT_SIZE - 8 + 1);
+        offset = i % (ALLOCATOR_AREA_SIZE - 8 + 1);
         *(int64_t *)(area + offset) = new_value;
     }
     end = clock();
@@ -85,7 +85,7 @@ void test_no_checkpoint(int8_t *area, int64_t new_value, int numberOfWrites, int
 
     begin = clock();
     for (int i = 0; i < numberOfReads; i++) {
-        offset = i % (CKPT_SIZE - 8 + 1);
+        offset = i % (ALLOCATOR_AREA_SIZE - 8 + 1);
         read_value = *(int64_t *)(area + offset);
     }
     end = clock();
@@ -96,8 +96,8 @@ void test_no_checkpoint(int8_t *area, int64_t new_value, int numberOfWrites, int
 
 /* Verify that the set bits correspond to the correctly saved quadwords. */
 int verify_checkpoint(int8_t *area, int8_t *init_A_copy) {
-    int8_t *bitmap = area + CKPT_SIZE * 2;
-    int8_t *areaS = area + CKPT_SIZE;
+    int8_t *bitmap = area + ALLOCATOR_AREA_SIZE * 2;
+    int8_t *areaS = area + ALLOCATOR_AREA_SIZE;
     int8_t *areaAcopy = init_A_copy;
     for (int offset = 0; offset < BITMAP_SIZE; offset += 8) {
         if (*(int64_t *)(bitmap + offset) == 0) {
@@ -129,8 +129,8 @@ int verify_checkpoint(int8_t *area, int8_t *init_A_copy) {
 }
 
 void restore_area(int8_t *area) {
-    int8_t *bitmap = area + CKPT_SIZE * 2;
-    int8_t *src = area + CKPT_SIZE;
+    int8_t *bitmap = area + ALLOCATOR_AREA_SIZE * 2;
+    int8_t *src = area + ALLOCATOR_AREA_SIZE;
     int8_t *dst = area;
     for (int offset = 0; offset < BITMAP_SIZE; offset += 8) {
         if (*(int64_t *)(bitmap + offset) == 0) {
@@ -155,7 +155,7 @@ void restore_area(int8_t *area) {
 
 void clean_cache(int8_t *area) {
     int cache_line_size = __builtin_cpu_supports("sse2") ? 64 : 32;
-    for (int i = 0; i < (2 * CKPT_SIZE + BITMAP_SIZE); i += (cache_line_size / 8)) {
+    for (int i = 0; i < (2 * ALLOCATOR_AREA_SIZE + BITMAP_SIZE); i += (cache_line_size / 8)) {
         _mm_clflush(area + i);
     }
 }
@@ -204,29 +204,29 @@ int main(int argc, char *argv[]) {
     printf("First Value 0x%lx\n", first_value);
     printf("Second Value 0x%lx\n\n", second_value);
 
-    size_t alignment = 8 * (1024 * CKPT_SIZE);
-    int8_t *area = (int8_t *)aligned_alloc(alignment, CKPT_SIZE * 2 + BITMAP_SIZE);
+    size_t alignment = 8 * (1024 * ALLOCATOR_AREA_SIZE);
+    int8_t *area = (int8_t *)aligned_alloc(alignment, ALLOCATOR_AREA_SIZE * 2 + BITMAP_SIZE);
     if (area == NULL) {
         perror("aligned_alloc failed\n");
         return EXIT_FAILURE;
     }
 
-    memset(area, 0, CKPT_SIZE * 2 + BITMAP_SIZE);
+    memset(area, 0, ALLOCATOR_AREA_SIZE * 2 + BITMAP_SIZE);
 
     printf("BaseA: %p\n", area);
-    printf("BaseS: %p\n", area + CKPT_SIZE);
-    printf("BaseM: %p\n\n", area + (CKPT_SIZE * 2) + BITMAP_SIZE);
+    printf("BaseS: %p\n", area + ALLOCATOR_AREA_SIZE);
+    printf("BaseM: %p\n\n", area + (ALLOCATOR_AREA_SIZE * 2) + BITMAP_SIZE);
 
     init_area(area, init_value);
-    int8_t *init_A_copy = (int8_t *)mmap(NULL, CKPT_SIZE, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
+    int8_t *init_A_copy = (int8_t *)mmap(NULL, ALLOCATOR_AREA_SIZE, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
     if (init_A_copy == MAP_FAILED) {
         perror("mmap init area copy");
         return EXIT_FAILURE;
     }
 
-    memcpy(init_A_copy, area, CKPT_SIZE);
+    memcpy(init_A_copy, area, ALLOCATOR_AREA_SIZE);
 
-    ret = memcmp(area, init_A_copy, CKPT_SIZE);
+    ret = memcmp(area, init_A_copy, ALLOCATOR_AREA_SIZE);
     if (ret) {
         fprintf(stderr, "Area A check failed: %d\n", ret);
         return EXIT_FAILURE;
@@ -256,7 +256,7 @@ int main(int argc, char *argv[]) {
     double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
     printf("Time spent by restore: %f s\n", time_spent);
 
-    ret = memcmp(area, init_A_copy, CKPT_SIZE);
+    ret = memcmp(area, init_A_copy, ALLOCATOR_AREA_SIZE);
     if (ret) {
         fprintf(stderr, "Area A restore check failed: 0x%x\n", ret);
         return EXIT_FAILURE;
