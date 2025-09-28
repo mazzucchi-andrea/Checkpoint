@@ -12,11 +12,11 @@ ckpt_assembly:
 	lea -0x1000(%rsp),%rsp //this is for the stack red zone
 	pushf
         mov %rax,%rcx
-        and $0xffffffffffe00000, %rcx
-        and $0x1fffff, %rax
+        and $0xffffffffffc00000, %rcx
+        and $0x3fffff, %rax
         test $7,%rax
         jz second_qword
-        and $0x3ffff8,%rax
+        and $0x7ffff8,%rax
         shr $3, %rax
         mov %rax, %rbx
         and $15, %rbx
