@@ -56,6 +56,12 @@ dkms.conf
 
 # ide
 .vscode
+.idea
+
+#clang
 .clang-format
+
+# python venv
+*.venv
 
 /MVM/application/prog
