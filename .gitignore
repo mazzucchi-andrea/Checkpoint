@@ -65,3 +65,4 @@ dkms.conf
 *.venv
 
 /MVM/application/prog
+/graphs

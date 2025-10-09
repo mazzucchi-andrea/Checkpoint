@@ -14,9 +14,7 @@ jobs:
         working-directory: ./MVM
     steps:
       - uses: actions/checkout@v4
-      - name: Init
-        run: make all
-      - name: Test
-        run: ./application/prog 42 100
+      - name: Tests
+        run: bash tests.sh
       - name: Clean
         run: make clean

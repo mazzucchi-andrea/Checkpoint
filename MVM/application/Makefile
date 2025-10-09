@@ -1,2 +1,8 @@
+ALLOCATOR_AREA_SIZE=0x200000UL
+WRITES=950
+READS=50
+MOD=64
+CF=0
+
 all:
-	gcc -c prog.c -pie -fPIE  -I ../include -DALLOCATOR_AREA_SIZE=0x400000UL
+	gcc -c prog.c -funroll-loops -pie -fPIE -I ../include -DALLOCATOR_AREA_SIZE=$(ALLOCATOR_AREA_SIZE) -DWRITES=$(WRITES) -DREADS=$(READS) -DCF=$(CF) -DMOD=$(MOD)

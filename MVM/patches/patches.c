@@ -30,22 +30,17 @@ void the_patch(unsigned long mem, unsigned long regs) {
     if (instruction->effective_operand_address != 0x0) {
         printf("__mvm: accessed address is %p - data size is %d access type is "
                "%c\n",
-               (void *)instruction->effective_operand_address,
-               instruction->data_size, instruction->type);
+               (void *)instruction->effective_operand_address, instruction->data_size, instruction->type);
     } else {
         target = &(instruction->target);
         // AUDIT
-        printf("__mvm: accessing memory according to %lu - %lu - %lu - %lu\n",
-               target->displacement, target->base_index, target->scale_index,
-               target->scale);
+        printf("__mvm: accessing memory according to %lu - %lu - %lu - %lu\n", target->displacement, target->base_index,
+               target->scale_index, target->scale);
         if (target->base_index)
-            memcpy((char *)&A, (char *)(regs + 8 * (target->base_index - 1)),
-                   8);
+            memcpy((char *)&A, (char *)(regs + 8 * (target->base_index - 1)), 8);
         if (target->scale_index)
-            memcpy((char *)&B, (char *)(regs + 8 * (target->scale_index - 1)),
-                   8);
-        address = (unsigned long)((long)target->displacement + (long)A +
-                                  (long)((long)B * (long)target->scale));
+            memcpy((char *)&B, (char *)(regs + 8 * (target->scale_index - 1)), 8);
+        address = (unsigned long)((long)target->displacement + (long)A + (long)((long)B * (long)target->scale));
         printf("__mvm: accessed address is %p - data size is %d - access type "
                "is %c\n",
                (void *)address, instruction->data_size, instruction->type);
@@ -64,7 +59,7 @@ void the_patch(unsigned long mem, unsigned long regs) {
 // instrumentation instructions whill be executed right after the original
 // instruction to be instrumented
 
-#define buffer                                                                 \
+#define buffer                                                                                                         \
     user_defined_buffer // this avoids compile-time replication of the buffer
                         // symbol
 char buffer[1024];
@@ -89,13 +84,11 @@ void user_defined(instruction_record *actual_instruction, patch *actual_patch) {
 
     // check if the instructon is a non RIP-relative store
     // if it is, it can be skipped, otherwise it needs ot be instrumented
-    if (actual_instruction->rip_relative == 'n' &&
-        actual_instruction->type == 's') {
+    if (actual_instruction->rip_relative == 'n' && actual_instruction->type == 's') {
 
         fd = open(user_defined_temp_file, O_CREAT | O_TRUNC | O_RDWR, 0666);
         if (fd == -1) {
-            printf("%s: error opening temp file %s\n", VM_NAME,
-                   user_defined_temp_file);
+            printf("%s: error opening temp file %s\n", VM_NAME, user_defined_temp_file);
             fflush(stdout);
             exit(EXIT_FAILURE);
         }
@@ -104,17 +97,14 @@ void user_defined(instruction_record *actual_instruction, patch *actual_patch) {
         // in any case add the offset required by PARSIR ubiquitous for
         // replicating memory updates
         if (actual_instruction->dest[0] == '(') {
-            sprintf(buffer, "%s %s,%s%s\n", actual_instruction->op,
-                    actual_instruction->source, offset_string,
+            sprintf(buffer, "%s %s,%s%s\n", actual_instruction->op, actual_instruction->source, offset_string,
                     actual_instruction->dest);
         } else {
 
             sprintf(buffer, "%s", actual_instruction->dest);
             aux = strtok(buffer, "(");
-            sprintf(buffer, "%s %s,%p%s\n", actual_instruction->op,
-                    actual_instruction->source,
-                    (void *)(strtol(aux, NULL, 16) +
-                             strtol(offset_string, NULL, 16)),
+            sprintf(buffer, "%s %s,%p%s\n", actual_instruction->op, actual_instruction->source,
+                    (void *)(strtol(aux, NULL, 16) + strtol(offset_string, NULL, 16)),
                     (actual_instruction->dest + strlen(aux)));
         }
 
@@ -125,13 +115,11 @@ void user_defined(instruction_record *actual_instruction, patch *actual_patch) {
         actual_instruction->instrumentation_instructions += 1;
 
         // generate the binary of the instrumentaton instruction
-        sprintf(buffer, " cd %s; gcc %s -c", user_defined_dir,
-                user_defined_temp_file);
+        sprintf(buffer, " cd %s; gcc %s -c", user_defined_dir, user_defined_temp_file);
         ret = system(buffer);
 
         // put the binary on a file
-        sprintf(buffer, "cd %s; ./provide_binary %s > final-binary",
-                user_defined_dir, user_defined_temp_obj_file);
+        sprintf(buffer, "cd %s; ./provide_binary %s > final-binary", user_defined_dir, user_defined_temp_obj_file);
         ret = system(buffer);
 
         sprintf(buffer, "%s/final-binary", user_defined_dir);
@@ -173,22 +161,18 @@ void ckpt_patch(instruction_record *actual_instruction, patch *actual_patch) {
     printf("Load the store's address into rax: %s", buffer);
     fd = open(user_defined_temp_file, O_CREAT | O_TRUNC | O_RDWR, 0666);
     if (fd == -1) {
-        printf("%s: error opening temp file %s\n", VM_NAME,
-               user_defined_temp_file);
+        printf("%s: error opening temp file %s\n", VM_NAME, user_defined_temp_file);
         fflush(stdout);
         exit(EXIT_FAILURE);
     }
-    printf("Write the istruction to %s to compile it and get the binary\n",
-           user_defined_temp_file);
+    printf("Write the istruction to %s to compile it and get the binary\n", user_defined_temp_file);
     ret = write(fd, buffer, strlen(buffer));
     close(fd);
-    sprintf(buffer, " cd %s; gcc %s -c", user_defined_dir,
-            user_defined_temp_file);
+    sprintf(buffer, " cd %s; gcc %s -c", user_defined_dir, user_defined_temp_file);
     ret = system(buffer);
 
     // put the binary on a file
-    sprintf(buffer, "cd %s; ./provide_binary %s > final-binary",
-            user_defined_dir, user_defined_temp_obj_file);
+    sprintf(buffer, "cd %s; ./provide_binary %s > final-binary", user_defined_dir, user_defined_temp_obj_file);
     ret = system(buffer);
 
     sprintf(buffer, "%s/final-binary", user_defined_dir);
@@ -215,9 +199,55 @@ void ckpt_patch(instruction_record *actual_instruction, patch *actual_patch) {
 }
 
 void save_regs_tls(patch *actual_patch) {
+#if MOD == 64
     u_int8_t instructions[27] = {
-      0x65, 0x48, 0x89, 0x04, 0x25, 0x00, 0x00,0x00, 0x00, 
-      0x65, 0x48, 0x89, 0x1c, 0x25, 0x08, 0x00, 0x00, 0x00, 
-      0x65, 0x48, 0x89, 0x0c, 0x25, 0x10, 0x00, 0x00, 0x00};
+#elif MOD == 128
+    u_int8_t instructions[37] = {
+#endif
+        0x65,
+        0x48,
+        0x89,
+        0x04,
+        0x25,
+        0x00,
+        0x00,
+        0x00,
+        0x00, // mov %rax, %gs:0
+        0x65,
+        0x48,
+        0x89,
+        0x1c,
+        0x25,
+        0x08,
+        0x00,
+        0x00,
+        0x00, // mov %rbx, %gs:8
+        0x65,
+        0x48,
+        0x89,
+        0x0c,
+        0x25,
+        0x10,
+        0x00,
+        0x00,
+        0x00 // mov %rcx, %gs:16
+#if MOD == 128
+        ,
+        0x65,
+        0xf3,
+        0x0f,
+        0x7f,
+        0x0c,
+        0x25,
+        0x18,
+        0x00,
+        0x00,
+        0x00 // movdqu %xmm1, %gs:24
+#endif
+    };
+#if MOD == 64
     memcpy(actual_patch->code, (void *)instructions, 27);
+#elif MOD == 128
+    memcpy(actual_patch->code, (void *)instructions, 37);
+#endif
 }

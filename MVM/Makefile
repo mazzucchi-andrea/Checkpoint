@@ -35,7 +35,8 @@ UDTEMPOBJ = -Duser_defined_temp_obj_file=\"$(USER_DEFINED)/$(USER_DEFINED_OBJ_FI
 
 SECURITY_FLAGS = -pie -fPIE -fstack-protector-all
 
-ADDITIONAL_FLAGS = -O3 -DCKPT -DAPPLY_PATCHES -DVERBOSE -DALLOCATOR_AREA_SIZE=0x400000UL
+ADDITIONAL_FLAGS = -O3 -DCKPT -DAPPLY_PATCHES #-DVERBOSE
+
 #NOTE: 
 #the ASM_PREAMBLE macro enables building a demo patch for each memory access instruction
 #which passess control to a trampoline that calls the the_patch(...) fuction
@@ -43,18 +44,26 @@ ADDITIONAL_FLAGS = -O3 -DCKPT -DAPPLY_PATCHES -DVERBOSE -DALLOCATOR_AREA_SIZE=0x
 #the APPLY_PATCHES macro actually leads to apply the patches thar are build by the instrumentation process
 #the VERBOSE macro simply leads to the massive production of output messages 
 
+#CKPT FLAGS
+ALLOCATOR_AREA_SIZE=0x400000UL
+WRITES=300000
+READS=700000
+MOD=128
+CF=0
+
 
 THE_VM = -DVM_NAME=\"MVM\"
 
 all: checks backup-files file-rewriting compile-and-link restore-files
 
 compile-and-link: movm
-	export C_INCLUDE_PATH=$(PWD)/include; cd $(APP) ; make ; gcc $(APP_OBJ) $(LIB)/movm.o -o $(EXECUTABLE) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) $(LIBS) -Xlinker --wrap=main
+	@echo Compile prog with $(WRITES) writes and $(READS) reads
+	export C_INCLUDE_PATH=$(PWD)/include; cd $(APP) ; make ALLOCATOR_AREA_SIZE=$(ALLOCATOR_AREA_SIZE) MOD=$(MOD) WRITES=$(WRITES) READS=$(READS) CF=$(CF) ; gcc $(APP_OBJ) $(LIB)/movm.o -o $(EXECUTABLE) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) $(LIBS) -Xlinker --wrap=main
 	objdump -Dw $(EXECUTABLE) > $(DISASSEMBLY) 
 
 checks:
 	@if [ -d $(APP) ]; then echo ""; else echo "application directory does not exist" ; exit 1; fi
-	@./scripts/file-existence $(APP) $(TARGET_MODULES)
+	@./scripts/file-existence.sh $(APP) $(TARGET_MODULES)
 	@echo "PLEASE for any compiling error run 'make restore-files'\n"
 
 	@if [ ! -d $(OBJ) ]; then mkdir -p $(OBJ); fi
@@ -70,16 +79,16 @@ startup:
 	cd ./src; gcc _early_start.c -c -I$(INCLUDE) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) -o $(OBJ)/_early_start.o
 
 asm-patch:
-	cd ./src; gcc _asm_patches.S -c -I$(INCLUDE) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) -o $(OBJ)/_asm_patches.o
-	objdump -Dw $(OBJ)/_asm_patches.o > $(TEMP)/disassembly_asm_patch                   
+	cd ./src; gcc _asm_patches.S -c -I$(INCLUDE) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) -DALLOCATOR_AREA_SIZE=$(ALLOCATOR_AREA_SIZE) -DMOD=$(MOD) -o $(OBJ)/_asm_patches.o
+#objdump -Dw $(OBJ)/_asm_patches.o > $(TEMP)/disassembly_asm_patch                   
 
 patch:
-	cd ./patches; gcc patches.c -c -I$(INCLUDE) $(THE_VM) $(UDTEMPDIR) $(UDTEMPFILE) $(UDTEMPOBJ) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) -o $(OBJ)/_patches.o
+	cd ./patches; gcc patches.c -c -I$(INCLUDE) $(THE_VM) $(UDTEMPDIR) $(UDTEMPFILE) $(UDTEMPOBJ) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) -DMOD=$(MOD) -o $(OBJ)/_patches.o
 #please rember to insert whatever Makefile in the user-defined directory
 	cd $(USER_DEFINED); make
 
 movm: base head startup asm-patch patch 
-	cd ./src; gcc _elf_parse.c -c $(TEMPDIR) $(TEMPFILE) $(DISASSEMBLY_FILE) $(TEMPOBJ) $(TF) $(THE_VM) -I$(INCLUDE) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) -o $(OBJ)/_elf_parse.o
+	cd ./src; gcc _elf_parse.c -c $(TEMPDIR) $(TEMPFILE) $(DISASSEMBLY_FILE) $(TEMPOBJ) $(TF) $(THE_VM) -I$(INCLUDE) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) -DMOD=$(MOD) -o $(OBJ)/_elf_parse.o
 	cd $(OBJ) ; ld -i *.o -o $(LIB)/movm.o
 
 backup-files: checks

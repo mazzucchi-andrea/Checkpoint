@@ -17,10 +17,30 @@
 #include <time.h>
 
 #ifndef ALLOCATOR_AREA_SIZE
-#define ALLOCATOR_AREA_SIZE 0x200000UL
+#define ALLOCATOR_AREA_SIZE 0x400000UL
 #endif
 
-#define BITMAP_SIZE ALLOCATOR_AREA_SIZE / 8
+#ifndef WRITES
+#define WRITES 950
+#endif
+
+#ifndef READS
+#define READS 50
+#endif
+
+#ifndef CF
+#define CF 0
+#endif
+
+#ifndef MOD
+#define MOD 64
+#endif
+
+#if MOD == 64
+#define BITARRAY_SIZE ALLOCATOR_AREA_SIZE / 8
+#elif MOD == 128
+#define BITARRAY_SIZE ALLOCATOR_AREA_SIZE / 16
+#endif
 
 extern int arch_prctl(int code, unsigned long addr);
 
@@ -36,160 +56,127 @@ void *tls_setup() {
 
 /* Initialize the area with the given quadword */
 void init_area(int8_t *area, int64_t init_value) {
-    for (int i = 0; i < (ALLOCATOR_AREA_SIZE - 8); i++) {
+    for (int i = 0; i < (ALLOCATOR_AREA_SIZE - 8); i += 8) {
         *(int64_t *)(area + i) = init_value;
     }
 }
 
-/* Save original values and set the bitmap bit before writing the new value and read */
-void test_checkpoint(int8_t *area, int64_t new_value, int numberOfWrites, int numberOfReads) {
+/* Save original values and set the bitarray bit before writing the new value and read */
+float test_checkpoint(int8_t *area, int64_t new_value) {
     int offset;
     int64_t read_value;
     clock_t begin, end;
     double time_spent;
     begin = clock();
-    for (int i = 0; i < numberOfWrites; i++) {
+    for (int i = 0; i < WRITES; i += 4) {
         offset = i % (ALLOCATOR_AREA_SIZE - 8 + 1);
         *(int64_t *)(area + offset) = new_value;
     }
-    end = clock();
-
-    time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-    printf("Time spent by %d writes: %f s\n", numberOfWrites, time_spent);
-
-    begin = clock();
-    for (int i = 0; i < numberOfReads; i++) {
+    for (int i = 0; i < READS; i++) {
         offset = i % (ALLOCATOR_AREA_SIZE - 8 + 1);
         read_value = *(int64_t *)(area + offset);
     }
     end = clock();
-
     time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-    printf("Time spent by %d reads: %f s\n", numberOfReads, time_spent);
-}
-
-void test_no_checkpoint(int8_t *area, int64_t new_value, int numberOfWrites, int numberOfReads) {
-    int offset;
-    int64_t read_value;
-    clock_t begin, end;
-    double time_spent;
-    begin = clock();
-    for (int i = 0; i < numberOfWrites; i++) {
-        offset = i % (ALLOCATOR_AREA_SIZE - 8 + 1);
-        *(int64_t *)(area + offset) = new_value;
-    }
-    end = clock();
-
-    time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-    printf("Time spent by %d writes: %f s\n", numberOfWrites, time_spent);
-
-    begin = clock();
-    for (int i = 0; i < numberOfReads; i++) {
-        offset = i % (ALLOCATOR_AREA_SIZE - 8 + 1);
-        read_value = *(int64_t *)(area + offset);
-    }
-    end = clock();
-
-    time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-    printf("Time spent by %d reads: %f s\n", numberOfReads, time_spent);
+    return time_spent;
 }
 
 /* Verify that the set bits correspond to the correctly saved quadwords. */
 int verify_checkpoint(int8_t *area, int8_t *init_A_copy) {
-    int8_t *bitmap = area + ALLOCATOR_AREA_SIZE * 2;
+    int8_t *bitarray = area + ALLOCATOR_AREA_SIZE * 2;
     int8_t *areaS = area + ALLOCATOR_AREA_SIZE;
-    int8_t *areaAcopy = init_A_copy;
-    for (int offset = 0; offset < BITMAP_SIZE; offset += 8) {
-        if (*(int64_t *)(bitmap + offset) == 0) {
+    for (int offset = 0; offset < BITARRAY_SIZE; offset += 2) {
+        u_int16_t current_word = *(u_int16_t *)(bitarray + offset);
+        if (current_word == 0) {
             continue;
         }
-        for (int i = 0; i < 8; i++) {
-            int8_t current_byte = bitmap[offset + i];
-            if (current_byte == 0) {
-                continue;
-            }
-
-            for (int k = 0; k < 8; k++) {
-                if ((current_byte >> k) & 1) {
-                    int target_offset = ((offset + i) * 8 + k) * 8;
-                    if (*(int64_t *)(areaAcopy + target_offset) != *(int64_t *)(areaS + target_offset)) {
-                        fprintf(stderr,
-                                "Checkpoint verufy failed:\n"
-                                "Offset 0x%x\n"
-                                "Area S value: 0x%lx\n"
-                                "Area A init Value: 0x%lx\n",
-                                offset, *(int64_t *)(areaS + target_offset), *(int64_t *)(areaAcopy + target_offset));
-                        return -1;
-                    }
+        for (int k = 0; k < 16; k++) {
+            if ((current_word >> k) & 1) {
+#if MOD == 64
+                int target_offset = (offset * 8 + k) * 8;
+                if (*(u_int64_t *)(init_A_copy + target_offset) != *(u_int64_t *)(areaS + target_offset)) {
+                    fprintf(stderr,
+                            "Checkpoint verify failed:\n"
+                            "Offset 0x%x\n"
+                            "Area S value: 0x%lx\n"
+                            "Area A init Value: 0x%lx\n",
+                            offset, *(u_int64_t *)(areaS + target_offset), *(u_int64_t *)(init_A_copy + target_offset));
+                    return -1;
                 }
+#elif MOD == 128
+                int target_offset = (offset * 8 + k) * 16;
+                if (*(__int128 *)(init_A_copy + target_offset) != *(__int128 *)(areaS + target_offset)) {
+                    fprintf(stderr,
+                            "Checkpoint verify failed:\n"
+                            "BitArray Word Offset: 0x%x\n"
+                            "Bit: %d\n"
+                            "Target Offset: %d\n"
+                            "Area S Value: First qword: 0x%lx Second qword: 0x%lx\n"
+                            "Area A init Value First qword: 0x%lx Second qword: 0x%lx\n",
+                            offset, k, target_offset, *(int64_t *)(areaS + target_offset),
+                            *(int64_t *)(areaS + target_offset + 8), *(int64_t *)(init_A_copy + target_offset),
+                            *(int64_t *)(init_A_copy + target_offset + 8));
+                    return -1;
+                }
+#endif
             }
         }
     }
     return 0;
 }
 
-void restore_area(int8_t *area) {
-    int8_t *bitmap = area + ALLOCATOR_AREA_SIZE * 2;
+double restore_area(int8_t *area) {
+    int8_t *bitarray = area + 2 * ALLOCATOR_AREA_SIZE;
     int8_t *src = area + ALLOCATOR_AREA_SIZE;
     int8_t *dst = area;
-    for (int offset = 0; offset < BITMAP_SIZE; offset += 8) {
-        if (*(int64_t *)(bitmap + offset) == 0) {
+    u_int16_t current_word;
+    int target_offset;
+    clock_t begin, end;
+    double time_spent;
+    begin = clock();
+
+    for (int offset = 0; offset < BITARRAY_SIZE; offset += 8) {
+        if (*(u_int64_t *)(bitarray + offset) == 0) {
             continue;
         }
-        for (int i = 0; i < 8; i++) {
-            int8_t current_byte = bitmap[offset + i];
-            if (current_byte == 0) {
+        for (int i = 0; i < 8; i += 2) {
+            current_word = *(u_int16_t *)(bitarray + offset + i);
+            if (current_word == 0) {
                 continue;
             }
-
-            for (int k = 0; k < 8; k++) {
-                if ((current_byte >> k) & 1) {
-                    int target_offset = ((offset + i) * 8 + k) * 8;
-                    *(int64_t *)(dst + target_offset) = *(int64_t *)(src + target_offset);
+            for (int k = 0; k < 16; k++) {
+                if (((current_word >> k) & 1) == 1) {
+#if MOD == 64
+                    target_offset = ((offset + i) * 8 + k) * 8;
+                    *(u_int64_t *)(dst + target_offset) = *(u_int64_t *)(src + target_offset);
+#elif MOD == 128
+                    target_offset = ((offset + i) * 8 + k) * 16;
+                    *(__int128 *)(dst + target_offset) = *(__int128 *)(src + target_offset);
+#endif
                 }
             }
         }
     }
-    memset(bitmap, 0, BITMAP_SIZE);
+    memset(bitarray, 0, BITARRAY_SIZE);
+
+    end = clock();
+    time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+    return time_spent;
 }
 
 void clean_cache(int8_t *area) {
     int cache_line_size = __builtin_cpu_supports("sse2") ? 64 : 32;
-    for (int i = 0; i < (2 * ALLOCATOR_AREA_SIZE + BITMAP_SIZE); i += (cache_line_size / 8)) {
+    for (int i = 0; i < (2 * ALLOCATOR_AREA_SIZE + BITARRAY_SIZE); i += (cache_line_size / 8)) {
         _mm_clflush(area + i);
     }
 }
 
-/* Two parameters are needed to run the tests:
- * - numberOfWrites: the number of write operations to perform;
- * - numberOfReads: the number of read operations to perform;
- */
 int main(int argc, char *argv[]) {
+    double wr_time = 0, restore_time = 0;
+    char buffer[1024];
     char *endptr;
-    int numberOfWrites, numberOfReads, ret;
-    clock_t begin, end;
+    int ret;
     int64_t init_value, first_value, second_value;
-
-    if (argc < 3) {
-        fprintf(stderr, "Usage: %s <numberOfWrites> <<numberOfReads>\n", argv[0]);
-        return EXIT_FAILURE;
-    }
-
-    numberOfWrites = strtol(argv[1], &endptr, 10);
-    if (*endptr != '\0' || numberOfWrites <= 0) {
-        fprintf(stderr, "Number of writes must be an integer greater or eqaul to 1.\n");
-        return EXIT_FAILURE;
-    }
-
-    numberOfReads = strtol(argv[2], &endptr, 10);
-    if (*endptr != '\0' || numberOfReads < 0) {
-        fprintf(stderr, "Number of reads must be an integer greater or eqaul to 0.\n");
-        return EXIT_FAILURE;
-    }
-
-    printf("Number of Writes: %d\n", numberOfWrites);
-    printf("Number of Reads: %d\n\n", numberOfReads);
-
     if (tls_setup() == NULL) {
         fprintf(stderr, "tls_setup failed\n");
         return EXIT_FAILURE;
@@ -200,25 +187,18 @@ int main(int argc, char *argv[]) {
     first_value = rand() % (0xFFFFFFFFFFFFFFFF - 1 + 1) + 1;
     second_value = rand() % (0xFFFFFFFFFFFFFFFF - 1 + 1) + 1;
 
-    printf("Initial Value 0x%lx\n", init_value);
-    printf("First Value 0x%lx\n", first_value);
-    printf("Second Value 0x%lx\n\n", second_value);
-
     size_t alignment = 8 * (1024 * ALLOCATOR_AREA_SIZE);
-    int8_t *area = (int8_t *)aligned_alloc(alignment, ALLOCATOR_AREA_SIZE * 2 + BITMAP_SIZE);
+    int8_t *area = (int8_t *)aligned_alloc(alignment, ALLOCATOR_AREA_SIZE * 2 + BITARRAY_SIZE);
     if (area == NULL) {
         perror("aligned_alloc failed\n");
         return EXIT_FAILURE;
     }
 
-    memset(area, 0, ALLOCATOR_AREA_SIZE * 2 + BITMAP_SIZE);
-
-    printf("BaseA: %p\n", area);
-    printf("BaseS: %p\n", area + ALLOCATOR_AREA_SIZE);
-    printf("BaseM: %p\n\n", area + (ALLOCATOR_AREA_SIZE * 2) + BITMAP_SIZE);
+    memset(area, 0, ALLOCATOR_AREA_SIZE * 2 + BITARRAY_SIZE);
 
     init_area(area, init_value);
-    int8_t *init_A_copy = (int8_t *)mmap(NULL, ALLOCATOR_AREA_SIZE, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
+    int8_t *init_A_copy =
+        (int8_t *)mmap(NULL, ALLOCATOR_AREA_SIZE, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
     if (init_A_copy == MAP_FAILED) {
         perror("mmap init area copy");
         return EXIT_FAILURE;
@@ -231,41 +211,37 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Area A check failed: %d\n", ret);
         return EXIT_FAILURE;
     }
-
-    printf("Start Tests\n");
     clean_cache(area);
-    test_checkpoint(area, first_value, numberOfWrites, numberOfReads);
 
-    if (verify_checkpoint(area, init_A_copy)) {
-        return EXIT_FAILURE;
+    for (int i = 0; i < 128; i++) {
+#if CF == 1
+        clean_cache(area);
+#endif
+        wr_time += test_checkpoint(area, first_value);
+        if (verify_checkpoint(area, init_A_copy)) {
+            return EXIT_FAILURE;
+        }
+
+#if CF == 1
+        clean_cache(area);
+#endif
+        restore_time += restore_area(area);
+        ret = memcmp(area, init_A_copy, ALLOCATOR_AREA_SIZE);
+        if (ret) {
+            fprintf(stderr, "Area A restore check failed: 0x%x\n", ret);
+            return EXIT_FAILURE;
+        }
     }
 
-    printf("\nRepeat writes and reads to verify the time spent on already saved areas.\n");
-    clean_cache(area);
-    test_checkpoint(area, second_value, numberOfWrites, numberOfReads);
-
-    if (verify_checkpoint(area, init_A_copy)) {
-        return EXIT_FAILURE;
+    FILE *file = fopen("test_results.csv", "a");
+    if (file == NULL) {
+        fprintf(stderr, "Error opening file!\n");
+        return 1;
     }
+    sprintf(buffer, "%ld, %d, %d, %d, %d, %d, %f, %f\n", ALLOCATOR_AREA_SIZE, CF, MOD, WRITES + READS, WRITES, READS,
+            wr_time, restore_time);
+    fprintf(file, "%s", buffer);
+    fclose(file);
 
-    printf("\nTest Restore Function\n");
-    clean_cache(area);
-    begin = clock();
-    restore_area(area);
-    end = clock();
-    double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-    printf("Time spent by restore: %f s\n", time_spent);
-
-    ret = memcmp(area, init_A_copy, ALLOCATOR_AREA_SIZE);
-    if (ret) {
-        fprintf(stderr, "Area A restore check failed: 0x%x\n", ret);
-        return EXIT_FAILURE;
-    }
-
-    printf("\nRepeat the writes without checkpoint to measure the overhead\n");
-    clean_cache(area);
-    test_no_checkpoint(area, first_value, numberOfWrites, numberOfReads);
-
-    printf("\nTest Passed\n");
     return EXIT_SUCCESS;
 }
