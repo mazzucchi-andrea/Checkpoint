@@ -65,4 +65,4 @@ dkms.conf
 *.venv
 
 /MVM/application/prog
-/graphs
+/graphs_ckpt

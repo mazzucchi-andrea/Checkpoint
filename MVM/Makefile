@@ -35,7 +35,7 @@ UDTEMPOBJ = -Duser_defined_temp_obj_file=\"$(USER_DEFINED)/$(USER_DEFINED_OBJ_FI
 
 SECURITY_FLAGS = -pie -fPIE -fstack-protector-all
 
-ADDITIONAL_FLAGS = -O3 -DCKPT -DAPPLY_PATCHES #-DVERBOSE
+ADDITIONAL_FLAGS = -O3 -DCKPT -DAPPLY_PATCHES -DVERBOSE
 
 #NOTE: 
 #the ASM_PREAMBLE macro enables building a demo patch for each memory access instruction
@@ -45,10 +45,10 @@ ADDITIONAL_FLAGS = -O3 -DCKPT -DAPPLY_PATCHES #-DVERBOSE
 #the VERBOSE macro simply leads to the massive production of output messages 
 
 #CKPT FLAGS
-ALLOCATOR_AREA_SIZE=0x400000UL
-WRITES=300000
-READS=700000
-MOD=128
+ALLOCATOR_AREA_SIZE=0x100000UL
+WRITES=1000
+READS=0
+MOD=256
 CF=0
 
 
@@ -78,16 +78,19 @@ head:
 startup:
 	cd ./src; gcc _early_start.c -c -I$(INCLUDE) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) -o $(OBJ)/_early_start.o
 
+tls:
+	cd ./src; gcc _tls_setup.c -c -I$(INCLUDE) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) -o $(OBJ)/_tls_setup.o
+
 asm-patch:
 	cd ./src; gcc _asm_patches.S -c -I$(INCLUDE) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) -DALLOCATOR_AREA_SIZE=$(ALLOCATOR_AREA_SIZE) -DMOD=$(MOD) -o $(OBJ)/_asm_patches.o
-#objdump -Dw $(OBJ)/_asm_patches.o > $(TEMP)/disassembly_asm_patch                   
+	objdump -Dw $(OBJ)/_asm_patches.o > $(TEMP)/disassembly_asm_patch                   
 
 patch:
 	cd ./patches; gcc patches.c -c -I$(INCLUDE) $(THE_VM) $(UDTEMPDIR) $(UDTEMPFILE) $(UDTEMPOBJ) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) -DMOD=$(MOD) -o $(OBJ)/_patches.o
 #please rember to insert whatever Makefile in the user-defined directory
 	cd $(USER_DEFINED); make
 
-movm: base head startup asm-patch patch 
+movm: base head startup asm-patch patch tls
 	cd ./src; gcc _elf_parse.c -c $(TEMPDIR) $(TEMPFILE) $(DISASSEMBLY_FILE) $(TEMPOBJ) $(TF) $(THE_VM) -I$(INCLUDE) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) -DMOD=$(MOD) -o $(OBJ)/_elf_parse.o
 	cd $(OBJ) ; ld -i *.o -o $(LIB)/movm.o
 

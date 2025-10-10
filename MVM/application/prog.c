@@ -1,6 +1,6 @@
-#include <asm/prctl.h>
-
 #include <emmintrin.h> // SSE2
+
+#include <immintrin.h> // AVX
 
 #include <linux/limits.h>
 
@@ -17,7 +17,7 @@
 #include <time.h>
 
 #ifndef ALLOCATOR_AREA_SIZE
-#define ALLOCATOR_AREA_SIZE 0x400000UL
+#define ALLOCATOR_AREA_SIZE 0x100000UL
 #endif
 
 #ifndef WRITES
@@ -40,19 +40,9 @@
 #define BITARRAY_SIZE ALLOCATOR_AREA_SIZE / 8
 #elif MOD == 128
 #define BITARRAY_SIZE ALLOCATOR_AREA_SIZE / 16
+#elif MOD == 256
+#define BITARRAY_SIZE ALLOCATOR_AREA_SIZE / 32
 #endif
-
-extern int arch_prctl(int code, unsigned long addr);
-
-void *tls_setup() {
-    unsigned long addr;
-    addr = (unsigned long)mmap(NULL, 64, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
-    *(unsigned long *)addr = addr;
-    if (arch_prctl(ARCH_SET_GS, addr)) {
-        return NULL;
-    }
-    return (void *)addr;
-}
 
 /* Initialize the area with the given quadword */
 void init_area(int8_t *area, int64_t init_value) {
@@ -102,7 +92,6 @@ int verify_checkpoint(int8_t *area, int8_t *init_A_copy) {
                             "Area A init Value: 0x%lx\n",
                             offset, *(u_int64_t *)(areaS + target_offset), *(u_int64_t *)(init_A_copy + target_offset));
                     return -1;
-                }
 #elif MOD == 128
                 int target_offset = (offset * 8 + k) * 16;
                 if (*(__int128 *)(init_A_copy + target_offset) != *(__int128 *)(areaS + target_offset)) {
@@ -117,8 +106,26 @@ int verify_checkpoint(int8_t *area, int8_t *init_A_copy) {
                             *(int64_t *)(areaS + target_offset + 8), *(int64_t *)(init_A_copy + target_offset),
                             *(int64_t *)(init_A_copy + target_offset + 8));
                     return -1;
-                }
+#elif MOD == 256
+                int target_offset = (offset * 8 + k) * 32;
+                if (memcmp(init_A_copy + target_offset, areaS + target_offset, 32)) {
+                    fprintf(
+                        stderr,
+                        "Checkpoint verify failed:\n"
+                        "BitArray Word Offset: 0x%x\n"
+                        "Bit: %d\n"
+                        "Target Offset: %d\n"
+                        "Area S Value: First qword: 0x%lx Second qword: 0x%lx Third qword: 0x%lx Fourth qword: 0x%lx\n"
+                        "Area A init Value First qword: 0x%lx Second qword: 0x%lx Third qword: 0x%lx Fourth qword: "
+                        "0x%lx\n",
+                        offset, k, target_offset, *(int64_t *)(areaS + target_offset),
+                        *(int64_t *)(areaS + target_offset + 8), *(int64_t *)(areaS + target_offset + 16),
+                        *(int64_t *)(areaS + target_offset + 24), *(int64_t *)(init_A_copy + target_offset),
+                        *(int64_t *)(init_A_copy + target_offset + 8), *(int64_t *)(init_A_copy + target_offset + 16),
+                        *(int64_t *)(init_A_copy + target_offset + 24));
+                    return -1;
 #endif
+                }
             }
         }
     }
@@ -152,6 +159,10 @@ double restore_area(int8_t *area) {
 #elif MOD == 128
                     target_offset = ((offset + i) * 8 + k) * 16;
                     *(__int128 *)(dst + target_offset) = *(__int128 *)(src + target_offset);
+#elif MOD == 256
+                    target_offset = ((offset + i) * 8 + k) * 32;
+                    __m256i ckpt_value = _mm256_loadu_si256((__m256i *)(src + target_offset));
+                    _mm256_storeu_si256((__m256i *)(dst + target_offset), ckpt_value);
 #endif
                 }
             }
@@ -177,10 +188,6 @@ int main(int argc, char *argv[]) {
     char *endptr;
     int ret;
     int64_t init_value, first_value, second_value;
-    if (tls_setup() == NULL) {
-        fprintf(stderr, "tls_setup failed\n");
-        return EXIT_FAILURE;
-    }
 
     srand(42);
     init_value = rand() % (0xFFFFFFFFFFFFFFFF - 1 + 1) + 1;

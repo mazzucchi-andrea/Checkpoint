@@ -77,8 +77,8 @@ end_checkpoint:
 next_qword:
         shl $4, %rax
         add %rbx, %rax
-check_last:
         shl $4, %rax
+check_last:
         add $16, %rax
         cmp $ALLOCATOR_AREA_SIZE, %rax
         jge end_checkpoint
@@ -99,6 +99,54 @@ end_checkpoint:
         mov %gs:8, %rbx
         mov %gs:16, %rcx
         movdqu %gs:24, %xmm1
+	popf
+	lea 0x1000(%rsp),%rsp
+#elif MOD == 256
+	lea -0x1000(%rsp),%rsp //this is for the stack red zone
+	pushf
+        mov %rax,%rcx
+        and $0xffffffffffc00000, %rcx
+        and $0x3fffff, %rax
+        test $15,%rax
+        jz second_qword
+        and $0x7ffff0,%rax
+        shr $4, %rax
+        mov %rax, %rbx
+        and $15, %rbx
+        shr $5, %rax
+        bts %bx, (2 *ALLOCATOR_AREA_SIZE)(%rcx, %rax, 2)
+        jc next_qword
+        shl $4, %rax
+        add %rbx, %rax
+        shl $5, %rax
+        vmovdqu (%rcx, %rax,), %ymm1
+        vmovdqu %ymm1, ALLOCATOR_AREA_SIZE(%rcx, %rax,)
+        jmp check_last
+next_qword:
+        shl $4, %rax
+        add %rbx, %rax
+        shl $5, %rax
+check_last:
+        add $32, %rax
+        cmp $ALLOCATOR_AREA_SIZE, %rax
+        jge end_checkpoint
+second_qword:
+        shr $4, %rax
+        mov %rax, %rbx
+        and $15, %rbx
+        shr $5, %rax
+        bts %bx, (2 * ALLOCATOR_AREA_SIZE)(%rcx, %rax, 2)
+        jc end_checkpoint
+        shl $4, %rax
+        add %rbx, %rax
+        shl $5, %rax
+        vmovdqu (%rcx, %rax,), %ymm1
+        vmovdqu %ymm1, ALLOCATOR_AREA_SIZE(%rcx, %rax,)
+end_checkpoint:
+        mov %gs:0, %rax
+        mov %gs:8, %rbx
+        mov %gs:16, %rcx
+        vmovdqu %gs:24, %ymm1
 	popf
 	lea 0x1000(%rsp),%rsp
 #endif

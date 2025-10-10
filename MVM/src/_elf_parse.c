@@ -10,6 +10,7 @@
 
 #include "head.h"
 #include "elf_parse.h"
+#include "tls_setup.h"
 
 
 void user_defined(instruction_record *, patch *);
@@ -126,7 +127,7 @@ void build_patches(void){
 	uint64_t ckpt_code = (uint64_t)ckpt_assembly;
 #if MOD == 64
 	int ckpt_code_size = 0xbe;	//this is taken from the compiled version of the src/_asm_patch.S file
-#elif MOD == 128
+#elif MOD == 128 || MOD == 256
 	int ckpt_code_size = 0xd4;	//this is taken from the compiled version of the src/_asm_patch.S file
 #endif
 
@@ -183,7 +184,7 @@ void build_patches(void){
 		memset((char*)(patches[i].code),0x90, 37 + ckpt_code_size);
 		save_regs_tls(&patches[i]);
 		patches[i].code = patches[i].code + 27;// 27 is the size of the instructions to save the regs in gs
-		#elif MOD == 128
+		#elif MOD == 128 || MOD == 256
 		memset((char*)(patches[i].code),0x90, 47 + ckpt_code_size);
 		save_regs_tls(&patches[i]);
 		patches[i].code = patches[i].code + 37;// 37 is the size of the instructions to save the regs in gs
@@ -203,7 +204,7 @@ void build_patches(void){
 		//NOTE: you will need to have patches[i].code point again to patches[i].block before proceeding with the following if/else
 		#if MOD == 64	
 		patches[i].code = patches[i].code - 37 - ckpt_code_size;
-		#elif MOD == 128
+		#elif MOD == 128 || MOD == 256
 		patches[i].code = patches[i].code - 47 - ckpt_code_size;
 		#endif
 #endif
@@ -276,7 +277,7 @@ void build_patches(void){
 		//NOTE: for the below code fragment you will need to have patches[i].code point to the copy of the original instruction - you will need to step forward other preceeding instructions forming the patch
 		#if MOD == 64
 		patches[i].code = patches[i].code + 37 + ckpt_code_size;
-		#elif MOD == 128
+		#elif MOD == 128 || MOD == 256
 		patches[i].code = patches[i].code + 47 + ckpt_code_size;
 		#endif
 #endif
@@ -874,7 +875,10 @@ int __wrap_main(int argc, char ** argv){
 
 	int ret;
 	int i;
-	char *command; 
+	char *command;
+#ifdef CKPT
+	void *tls;
+#endif
 
 	setup_memory_access_rules();
 
@@ -917,6 +921,14 @@ int __wrap_main(int argc, char ** argv){
 	AUDIT
 	printf("patches applied - control goes to the actual program\n\n");
 	fflush(stdout);
+
+#ifdef CKPT
+	tls = tls_setup();
+	if (tls_setup() == NULL) {
+        fprintf(stderr, "tls_setup failed\n");
+        return EXIT_FAILURE;
+    }
+#endif
 
 	return __real_main(argc,argv);
 
