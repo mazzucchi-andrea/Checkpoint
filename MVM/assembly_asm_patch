@@ -1,0 +1,69 @@
+
+obj/_asm_patches.o:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000000000000 <the_patch_assembly>:
+   0:	48 8d a4 24 00 f0 ff ff 	lea    -0x1000(%rsp),%rsp
+   8:	9c                   	pushf
+   9:	57                   	push   %rdi
+   a:	56                   	push   %rsi
+   b:	52                   	push   %rdx
+   c:	51                   	push   %rcx
+   d:	50                   	push   %rax
+   e:	41 50                	push   %r8
+  10:	41 51                	push   %r9
+  12:	41 52                	push   %r10
+  14:	41 53                	push   %r11
+  16:	53                   	push   %rbx
+  17:	55                   	push   %rbp
+  18:	41 54                	push   %r12
+  1a:	41 55                	push   %r13
+  1c:	41 56                	push   %r14
+  1e:	41 57                	push   %r15
+  20:	48 89 e6             	mov    %rsp,%rsi
+  23:	48 bf ff 00 00 00 00 00 00 00 	movabs $0xff,%rdi
+  2d:	e8 00 00 00 00       	call   32 <the_patch_assembly+0x32>
+  32:	41 5f                	pop    %r15
+  34:	41 5e                	pop    %r14
+  36:	41 5d                	pop    %r13
+  38:	41 5c                	pop    %r12
+  3a:	5d                   	pop    %rbp
+  3b:	5b                   	pop    %rbx
+  3c:	41 5b                	pop    %r11
+  3e:	41 5a                	pop    %r10
+  40:	41 59                	pop    %r9
+  42:	41 58                	pop    %r8
+  44:	58                   	pop    %rax
+  45:	59                   	pop    %rcx
+  46:	5a                   	pop    %rdx
+  47:	5e                   	pop    %rsi
+  48:	5f                   	pop    %rdi
+  49:	9d                   	popf
+  4a:	48 8d a4 24 00 10 00 00 	lea    0x1000(%rsp),%rsp
+
+Disassembly of section .note.gnu.property:
+
+0000000000000000 <.note.gnu.property>:
+   0:	04 00                	add    $0x0,%al
+   2:	00 00                	add    %al,(%rax)
+   4:	20 00                	and    %al,(%rax)
+   6:	00 00                	add    %al,(%rax)
+   8:	05 00 00 00 47       	add    $0x47000000,%eax
+   d:	4e 55                	rex.WRX push %rbp
+   f:	00 02                	add    %al,(%rdx)
+  11:	00 01                	add    %al,(%rcx)
+  13:	c0 04 00 00          	rolb   $0x0,(%rax,%rax,1)
+  17:	00 01                	add    %al,(%rcx)
+  19:	00 00                	add    %al,(%rax)
+  1b:	00 00                	add    %al,(%rax)
+  1d:	00 00                	add    %al,(%rax)
+  1f:	00 01                	add    %al,(%rcx)
+  21:	00 01                	add    %al,(%rcx)
+  23:	c0 04 00 00          	rolb   $0x0,(%rax,%rax,1)
+  27:	00 01                	add    %al,(%rcx)
+  29:	00 00                	add    %al,(%rax)
+  2b:	00 00                	add    %al,(%rax)
+  2d:	00 00                	add    %al,(%rax)
+	...
