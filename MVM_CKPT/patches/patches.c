@@ -160,14 +160,14 @@ void ckpt_patch(instruction_record *actual_instruction, patch *actual_patch) {
     int ret;
     actual_instruction->instrumentation_instructions += 1;
     sprintf(buffer, "lea %s, %%rax\n", actual_instruction->dest);
-    printf("Load the store's address into rax: %s", buffer);
+    AUDIT printf("Load the store's address into rax: %s", buffer);
     fd = open(user_defined_temp_file, O_CREAT | O_TRUNC | O_RDWR, 0666);
     if (fd == -1) {
         printf("%s: error opening temp file %s\n", VM_NAME, user_defined_temp_file);
         fflush(stdout);
         exit(EXIT_FAILURE);
     }
-    printf("Write the istruction to %s to compile it and get the binary\n", user_defined_temp_file);
+    AUDIT printf("Write the istruction to %s to compile it and get the binary\n", user_defined_temp_file);
     ret = write(fd, buffer, strlen(buffer));
     close(fd);
     sprintf(buffer, " cd %s; gcc %s -c", user_defined_dir, user_defined_temp_file);
@@ -188,7 +188,7 @@ void ckpt_patch(instruction_record *actual_instruction, patch *actual_patch) {
 
     // get the binary
     ret = read(fd, buffer, LINE_SIZE);
-    printf("The compiled lea is %d bytes\n", ret);
+    AUDIT printf("The compiled lea is %d bytes\n", ret);
     if (ret > 10) {
         printf("%s: error generating the lea\n", VM_NAME);
         fflush(stdout);

@@ -187,12 +187,11 @@ int main(int argc, char *argv[]) {
     char buffer[1024];
     char *endptr;
     int ret;
-    int64_t init_value, first_value, second_value;
+    int64_t init_value, new_value;
 
     srand(42);
     init_value = rand() % (0xFFFFFFFFFFFFFFFF - 1 + 1) + 1;
-    first_value = rand() % (0xFFFFFFFFFFFFFFFF - 1 + 1) + 1;
-    second_value = rand() % (0xFFFFFFFFFFFFFFFF - 1 + 1) + 1;
+    new_value = rand() % (0xFFFFFFFFFFFFFFFF - 1 + 1) + 1;
 
     size_t alignment = 8 * (1024 * ALLOCATOR_AREA_SIZE);
     int8_t *area = (int8_t *)aligned_alloc(alignment, ALLOCATOR_AREA_SIZE * 2 + BITARRAY_SIZE);
@@ -224,7 +223,7 @@ int main(int argc, char *argv[]) {
 #if CF == 1
         clean_cache(area);
 #endif
-        wr_time += test_checkpoint(area, first_value);
+        wr_time += test_checkpoint(area, new_value);
         if (verify_checkpoint(area, init_A_copy)) {
             return EXIT_FAILURE;
         }

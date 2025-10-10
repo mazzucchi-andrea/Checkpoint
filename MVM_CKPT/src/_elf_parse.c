@@ -38,7 +38,7 @@ uint64_t intermediate_flags[SIZE];
 int intermediate_zones_index = -1;
 
 void audit_block(instruction_record *the_record){
-	if (the_record->type == 'l') {
+	if (the_record->type == 'l') { //avoid audit of load instruction
 		return;
 	}
 	printf("instruction record:\n \
@@ -134,7 +134,7 @@ void build_patches(void){
 	patches = (patch*)address1;
 
 	for (i=0;i<target_instructions;i++){
-		if (instructions[i].type == 'l') continue;
+		if (instructions[i].type == 'l') continue; // avoid patch of load instruction
 
 		//saving original instruction address
 		instruction_address = patches[i].original_instruction_address = instructions[i].address;
@@ -332,7 +332,7 @@ void apply_patches(void){
 	unsigned short instruction_short_patch;
 
 	for (i=0;i<target_instructions;i++){
-		if (instructions[i].type == 'l') continue;
+		if (instructions[i].type == 'l') continue; // avoid apply patch to load instructions
 		size = instructions[i].size;
 		instruction_address = instructions[i].address;
 		AUDIT
@@ -913,9 +913,11 @@ int __wrap_main(int argc, char ** argv){
 	apply_patches();
 #endif
 
-	printf("__mvm: list of instructions instrumented\n");
-	for (i=0;i<ret;i++){
-		audit_block(instructions+i);
+	AUDIT {
+		printf("__mvm: list of instructions instrumented\n");
+		for (i=0;i<ret;i++){
+			audit_block(instructions+i);
+		}
 	}
 
 	AUDIT
