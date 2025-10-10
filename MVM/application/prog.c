@@ -85,10 +85,6 @@ int main(int argc, char **argv) {
         clean_cache(area);
 #endif
         time += function(area, new_value);
-
-#if CF == 1
-        clean_cache(area);
-#endif
     }
 
     FILE *file = fopen("test_results.csv", "a");
