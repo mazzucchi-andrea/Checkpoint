@@ -61,7 +61,7 @@ end_checkpoint:
         and $0x3fffff, %rax
         test $15,%rax
         jz second_qword
-        and $0x7ffff0,%rax
+        and $0x7fffe0,%rax
         shr $4, %rax
         mov %rax, %rbx
         and $15, %rbx
