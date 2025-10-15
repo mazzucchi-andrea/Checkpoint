@@ -87,7 +87,7 @@ int main(int argc, char **argv) {
         time += function(area, new_value);
     }
 
-    FILE *file = fopen("test_results.csv", "a");
+    FILE *file = fopen("mvm_test_results.csv", "a");
     if (file == NULL) {
         fprintf(stderr, "Error opening file!\n");
         return 1;

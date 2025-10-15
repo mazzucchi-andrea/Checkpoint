@@ -45,7 +45,6 @@ ADDITIONAL_FLAGS = -O3 -DASM_PREAMBLE -DAPPLY_PATCHES #-DVERBOSE
 #the VERBOSE macro simply leads to the massive production of output messages 
 
 #TEST FLAGS
-MEM_SIZE=0x400000UL
 WRITES=950
 READS=50
 CF=0
@@ -56,7 +55,7 @@ all: checks backup-files file-rewriting compile-and-link restore-files
 
 compile-and-link: movm
 	@echo Compile prog with $(WRITES) writes and $(READS) reads
-	export C_INCLUDE_PATH=$(PWD)/include; cd $(APP) ; make MEM_SIZE=$(MEM_SIZE) WRITES=$(WRITES) READS=$(READS) CF=$(CF); gcc $(APP_OBJ) $(LIB)/movm.o -o $(EXECUTABLE) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) $(LIBS) -Xlinker --wrap=main
+	export C_INCLUDE_PATH=$(PWD)/include; cd $(APP) ; make WRITES=$(WRITES) READS=$(READS) CF=$(CF); gcc $(APP_OBJ) $(LIB)/movm.o -o $(EXECUTABLE) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) $(LIBS) -Xlinker --wrap=main
 	objdump -Dw $(EXECUTABLE) > $(DISASSEMBLY) 
 
 checks:

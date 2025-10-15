@@ -5,7 +5,7 @@ declare -a size=(0x100000UL 0x200000UL 0x400000UL)
 declare -a writes=(0.95 0.90 0.85 0.80 0.75 0.70 0.65 0.60 0.55 0.50 0.45 0.40 0.35 0.30)
 
 cd MVM
-echo "cache_flush,ops,writes,reads,time" > test_results.csv
+echo "cache_flush,ops,writes,reads,time" > mvm_test_results.csv
 
 for cf in 0 1;
 do
@@ -23,13 +23,13 @@ do
 done
 
 cd ../MVM_CKPT
-echo "size,cache_flush,mod,ops,writes,reads,ckpt_time,restore_time" > test_results.csv
+echo "size,cache_flush,mod,ops,writes,reads,ckpt_time,restore_time" > ckpt_test_results.csv
 
 for mod in 64 128 256;
 do
-    for cf in 0 1;
-    do
-        for s in ${size[@]};
+    for s in ${size[@]};
+        do
+        for cf in 0 1;
         do
             for o in ${ops[@]}; 
             do
@@ -47,6 +47,7 @@ do
 done
 
 cd ..
+echo "size,cache_flush,mod,ops,writes,reads,ckpt_time,restore_time, time" > combined_test_results.csv
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt

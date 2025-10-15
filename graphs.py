@@ -1,53 +1,89 @@
 import matplotlib.pyplot as plt
 import pandas as pd
+import numpy as np
 import os
 
-# Load the CSV file
-df = pd.read_csv("MVM_CKPT/test_results.csv")
+# --- Configuration for plotting ---
+BAR_WIDTH = 0.35 # Width of the bars
+OFFSET = BAR_WIDTH / 2 # Offset to center the group
+# ----------------------------------
 
-# Identify the unique groups based on (size, cache_flush, mod, ops)
-group_cols = ['size', 'cache_flush', 'mod', 'ops']
-unique_groups = df.groupby(group_cols).groups.keys()
+try:
+    df_ckpt = pd.read_csv("MVM_CKPT/ckpt_test_results.csv")
+    df_mvm = pd.read_csv("MVM/mvm_test_results.csv")
+except FileNotFoundError as e:
+    print(f"Error loading CSV file: {e}")
+    exit()
 
-if not os.path.exists("graphs_ckpt"):
-    os.makedirs("graphs_ckpt")
+group_cols_ckpt = ['size', 'cache_flush', 'mod', 'ops']
+unique_groups_ckpt = df_ckpt.groupby(group_cols_ckpt).groups.keys()
 
-# Iterate through each unique group and generate a stacked bar graph
-for group_key in unique_groups:
-    # Filter data for the current group
-    group_df = df[(df['size'] == group_key[0]) &
-                  (df['cache_flush'] == group_key[1]) &
-                  (df['mod'] == group_key[2]) &
-                  (df['ops'] == group_key[3])].copy()
+if not os.path.exists("graphs_combined"):
+    os.makedirs("graphs_combined")
 
-    # Sort by 'writes' for a logical progression on the x-axis
-    group_df = group_df.sort_values('writes')
+if not os.path.exists("graphs_combined/cf_enabled"):
+    os.makedirs("graphs_combined/cf_enabled")
 
-    # Prepare data for plotting
-    x_labels = group_df['writes'].astype(str)
-    ckpt_time = group_df['ckpt_time']
-    restore_time = group_df['restore_time']
+if not os.path.exists("graphs_combined/cf_disabled"):
+    os.makedirs("graphs_combined/cf_disabled")
 
-    # Create the stacked bar plot
+for group_key in unique_groups_ckpt:
+    size, cache_flush, mod, ops = group_key
+
+    group_df_ckpt = df_ckpt[(df_ckpt['size'] == size) &
+                            (df_ckpt['cache_flush'] == cache_flush) &
+                            (df_ckpt['mod'] == mod) &
+                            (df_ckpt['ops'] == ops)].copy()
+
+    group_df_ckpt = group_df_ckpt.sort_values('writes')
+
+    ckpt_time = group_df_ckpt['ckpt_time'].values
+    restore_time = group_df_ckpt['restore_time'].values
+
+    group_df_mvm = pd.DataFrame() # Initialize an empty DataFrame
+    # Filter MVM data based on matching 'cache_flush' and 'ops'
+    # Note: MVM data doesn't have 'size' or 'mod'
+    group_df_mvm = df_mvm[(df_mvm['cache_flush'] == cache_flush) &
+                            (df_mvm['ops'] == ops)].copy()
+    
+    # Ensure MVM data is also sorted by 'writes'
+    group_df_mvm = group_df_mvm.sort_values('writes')
+    
+    # Merge the two dataframes on 'writes' to align the plots
+    # 'how='left'' ensures we only consider 'writes' values present in the CKPT data
+    merged_df = pd.merge(group_df_ckpt, group_df_mvm, how='left', 
+    left_on=["cache_flush", "ops", "writes", "reads"], right_on=["cache_flush", "ops", "writes", "reads"], suffixes=('_ckpt', '_mvm'))
+    merged_df.to_csv("combined_test_results.csv", mode="a", header=False, index=False)
+    
+    # Only use the writes that are common to both (or NaN for missing MVM)
+    writes = merged_df['writes'].values
+    ckpt_time = merged_df['ckpt_time'].values
+    restore_time = merged_df['restore_time'].values
+    mvm_time = merged_df['time'].values # This will have NaN for non-matching writes in MVM
+
     fig, ax = plt.subplots(figsize=(12, 6))
 
-    # Plot ckpt_time (bottom)
-    ax.bar(x_labels, ckpt_time, label='ckpt_time', color='#1f77b4')
+    x = np.arange(len(writes))
 
-    # Plot restore_time (on top of ckpt_time)
-    # The 'bottom' argument ensures stacking starts where ckpt_time ends
-    ax.bar(x_labels, restore_time, bottom=ckpt_time, label='restore_time', color='#ff7f0e')
+    mvm_time_plot = np.nan_to_num(mvm_time)
+    ax.bar(x - OFFSET, mvm_time_plot, BAR_WIDTH, label='mvm_time', color='#2ca02c')
 
-    # Set labels and title
-    ax.set_xlabel('Writes (Number of Write Operations)') # X-axis label set to 'Writes'
+    # 2. Plot the MVM_CKPT stacked bar (shifted right by OFFSET)
+    # ckpt_time bottom part
+    ax.bar(x + OFFSET, ckpt_time, BAR_WIDTH, label='ckpt_time', color='#1f77b4')
+    # restore_time top part
+    ax.bar(x + OFFSET, restore_time, BAR_WIDTH, bottom=ckpt_time, label='restore_time', color='#ff7f0e')
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(writes.astype(str))
+
+    ax.set_xlabel('Writes (Number of Write Operations)')
     ax.set_ylabel('Time (s)')
 
-    # Construct a descriptive title
-    title = (f"Stacked Time for (size={group_key[0]}, cache_flush={group_key[1]}, "
-             f"mod={group_key[2]}, ops={group_key[3]})")
+    title = (f"Time Comparison (MVM vs MVM_CKPT) for (size={size}, cache_flush={cache_flush}, "
+             f"mod={mod}, ops={ops})")
     ax.set_title(title, wrap=True)
 
-    # Add legend
     ax.legend()
 
     # Rotate x-axis labels for better readability
@@ -56,57 +92,12 @@ for group_key in unique_groups:
     # Adjust layout to prevent labels from being cut off
     plt.tight_layout()
 
-    # Create a filename
-    filename = (f"graphs_ckpt/stacked_bar_size_{group_key[0]}_flush_{group_key[1]}_mod_{group_key[2]}_ops_{group_key[3]}.png")
+    if cache_flush == 0:
+        filename = (f"graphs_combined/cf_disabled/combined_bar_size_{size}_mod_{mod}_ops_{ops}.png")
+    else:
+        filename = (f"graphs_combined/cf_enabled/combined_bar_size_{size}_mod_{mod}_ops_{ops}.png")
+
     plt.savefig(filename)
     plt.close(fig)
 
-
-# Load the CSV file
-df = pd.read_csv("MVM/test_results.csv")
-
-group_cols = ['cache_flush', 'ops']
-unique_groups = df.groupby(group_cols).groups.keys()
-
-if not os.path.exists("graphs_mvm"):
-    os.makedirs("graphs_mvm")
-
-for group_key in unique_groups:
-    # Filter data for the current group
-    group_df = df[(df['cache_flush'] == group_key[0]) &
-                  (df['ops'] == group_key[1])].copy()
-
-    # Sort by 'writes' for a logical progression on the x-axis
-    group_df = group_df.sort_values('writes')
-
-    # Prepare data for plotting
-    x_labels = group_df['writes'].astype(str)
-    time = group_df['time']
-
-    # Create the stacked bar plot
-    fig, ax = plt.subplots(figsize=(12, 6))
-
-    # Plot time
-    ax.bar(x_labels, time, label='time', color='#1f77b4')
-
-    # Set labels and title
-    ax.set_xlabel('Writes (Number of Write Operations)') # X-axis label set to 'Writes'
-    ax.set_ylabel('Time (s)')
-
-    # Construct a descriptive title
-    title = (f"Time for (cache_flush={group_key[0]}, ops={group_key[1]})")
-    ax.set_title(title, wrap=True)
-
-    # Add legend
-    ax.legend()
-
-    # Rotate x-axis labels for better readability
-    plt.xticks(rotation=45, ha='right')
-
-    # Adjust layout to prevent labels from being cut off
-    plt.tight_layout()
-
-    # Create a filename
-    filename = (f"graphs_mvm/bar_cache_flush_{group_key[0]}_ops_{group_key[1]}.png")
-    plt.savefig(filename)
-    plt.close(fig)
+print("Combined graphs generated successfully in 'graphs_combined' directory.")

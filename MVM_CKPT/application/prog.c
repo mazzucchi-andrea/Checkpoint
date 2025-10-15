@@ -239,7 +239,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    FILE *file = fopen("test_results.csv", "a");
+    FILE *file = fopen("ckpt_test_results.csv", "a");
     if (file == NULL) {
         fprintf(stderr, "Error opening file!\n");
         return 1;
