@@ -1,4 +1,4 @@
-# TestCheckpoint
+# Checkpoint
 
 Consideriamo come riferimento un’area di memoria contigua di 2 * 2^21 + 0x40000 byte, quest’area è divisa in 3 sezioni:
 

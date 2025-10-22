@@ -11,10 +11,17 @@ jobs:
     defaults:
       run:
         shell: bash
-        working-directory: ./MVM
     steps:
       - uses: actions/checkout@v4
       - name: Tests
         run: bash tests.sh
-      - name: Clean
-        run: make clean
+      - name: Create staging directory for Graphs and CSVs
+        run: mkdir staging &
+      - name: Copy graphs
+        run: cp Checkpoint/graphs staging
+      - name: Copy CSV 
+        run: cp Checkpoint/combined_test_results.csv staging
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Package
+          path: staging

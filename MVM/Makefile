@@ -45,6 +45,7 @@ ADDITIONAL_FLAGS = -O3 -DASM_PREAMBLE -DAPPLY_PATCHES #-DVERBOSE
 #the VERBOSE macro simply leads to the massive production of output messages 
 
 #TEST FLAGS
+MEM_SIZE=0x100000UL
 WRITES=950
 READS=50
 CF=0
@@ -54,8 +55,7 @@ THE_VM = -DVM_NAME=\"MVM\"
 all: checks backup-files file-rewriting compile-and-link restore-files
 
 compile-and-link: movm
-	@echo Compile prog with $(WRITES) writes and $(READS) reads
-	export C_INCLUDE_PATH=$(PWD)/include; cd $(APP) ; make WRITES=$(WRITES) READS=$(READS) CF=$(CF); gcc $(APP_OBJ) $(LIB)/movm.o -o $(EXECUTABLE) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) $(LIBS) -Xlinker --wrap=main
+	export C_INCLUDE_PATH=$(PWD)/include; cd $(APP) ; make MEM_SIZE=$(MEM_SIZE) WRITES=$(WRITES) READS=$(READS) CF=$(CF); gcc $(APP_OBJ) $(LIB)/movm.o -o $(EXECUTABLE) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) $(LIBS) -Xlinker --wrap=main
 	objdump -Dw $(EXECUTABLE) > $(DISASSEMBLY) 
 
 checks:
@@ -76,7 +76,7 @@ asm-patch:
 	cd ./src; gcc _asm_patches.S -c -I$(INCLUDE) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) -o $(OBJ)/_asm_patches.o
 
 patch:
-	cd ./patches; gcc patches.c -c -I$(INCLUDE) $(THE_VM) $(UDTEMPDIR) $(UDTEMPFILE) $(UDTEMPOBJ) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) -o $(OBJ)/_patches.o
+	cd ./patches; gcc patches.c -c -I$(INCLUDE) $(THE_VM) $(UDTEMPDIR) $(UDTEMPFILE) $(UDTEMPOBJ) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) -DMEM_SIZE=$(MEM_SIZE)  -o $(OBJ)/_patches.o
 #please rember to insert whatever Makefile in the user-defined directory
 	cd $(USER_DEFINED); make
 
@@ -95,4 +95,4 @@ file-rewriting:
 	export MVM_TEMP_FILE=$(TEMP)/__temp_file ; ./scripts/file-processor.sh $(APP) $(TARGET_MODULES)
 
 clean:
-	rm -rf *.o ; rm $(EXECUTABLE)
+	find . -name "*.o" -type f -delete ; rm -f $(EXECUTABLE)

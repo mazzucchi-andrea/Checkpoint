@@ -1,0 +1,157 @@
+/include/tls_setup.h
+/src/_tls_setup.c
+Introduzione della funzione void *tls_setup(), un utility che permette di allocare una area di memoria di 64 byte e 
+assegnarla al segmento GS.
+
+/patches/patches.c
+Introduzione delle funzioni:
+    - void ckpt_patch(instruction_record *actual_instruction, patch *actual_patch)
+    - void save_regs_tls(patch *actual_patch)
+ckpt_path permette di creare un'istruzione lea in modo da caricare nel registro rax l'indirizzo di memoria su cui sta 
+operando l'operazione di mov patchata.
+save_regs_tls salva in actual_patch il codice bianrio equivalente a:
+    mov %rax, %gs:0
+    mov %rbx, %gs:8
+    mov %rcx, %gs:16
+nel caso 64 bit.
+Per i casi 128 bit e 256 bit vengono aggiunti rispettivamente l'istruzione movdqu %xmm1, %gs:24 o vmovdqu %ymm1, %gs:24.
+
+/src/_asm_patches.S 
+Alla label ckpt_assembly viene introdotto il codice asm che effetua il checkpoint per le tre modalità (64 bit, 128 bit, 256 bit).
+
+/src/_elf_parse.c 
+Di seguito le modiche linea per linea.
+
+17 #if CKPT
+18 void ckpt_patch(instruction_record *, patch *);
+19 void save_regs_tls(patch *);
+20 #endif
+
+43 #if CKPT
+44 	if (the_record->type == 'l') { //avoid audit of load instruction in ckpt
+45 		return;
+46 	}
+47 #endif
+Nel caso CKPT si evita l'audit nel caso delle operazione di load.
+
+131 #if CKPT
+132 	uint64_t ckpt_code = (uint64_t)ckpt_assembly;
+133 #if MOD == 64
+134 	int ckpt_code_size = 0xbe;	//this is taken from the compiled version of the src/_asm_patch.S file
+135 #elif MOD == 128 || MOD == 256
+136 	int ckpt_code_size = 0xd4;	//this is taken from the compiled version of the src/_asm_patch.S file
+137 #endif
+138 #endif
+Definisce il codice di checkpoint e la sua size nelle varie modalità.
+
+143 		#if CKPT
+144 		if (instructions[i].type == 'l') continue; // avoid patch of load instruction
+145 		#endif
+Evita la patch delle istruzioni di load
+
+190 #ifdef CKPT
+191 		#if MOD == 64
+192 		memset((char*)(patches[i].code),0x90, 37 + ckpt_code_size);
+193 		save_regs_tls(&patches[i]);
+194 		patches[i].code = patches[i].code + 27;// 27 is the size of the instructions to save the regs in gs
+195 		#elif MOD == 128 || MOD == 256
+196 		memset((char*)(patches[i].code),0x90, 47 + ckpt_code_size);
+197 		save_regs_tls(&patches[i]);
+198 		patches[i].code = patches[i].code + 37;// 37 is the size of the instructions to save the regs in gs
+199 		#endif
+200
+201 		ckpt_patch(&instructions[i], &patches[i]);
+202 		patches[i].code = patches[i].code + 10;//10 is the mazimum size of the lea instruction
+203 		memcpy((char*)(patches[i].code),(char*)(ckpt_code),ckpt_code_size);
+204 		patches[i].code = patches[i].code + ckpt_code_size;
+205 #endif
+Chiamate a save_rgs_tls e ckpt_path prima del salvataggio del codice di checkpointing.
+
+210 #ifdef CKPT
+211		//move again at the begin of the block of instructions forming the patch
+212		//NOTE: you will need to have patches[i].code point again to patches[i].block before proceeding with the following if/else
+213 		#if MOD == 64	
+214 		patches[i].code = patches[i].code - 37 - ckpt_code_size;
+215 		#elif MOD == 128 || MOD == 256
+216 		patches[i].code = patches[i].code - 47 - ckpt_code_size;
+217 		#endif
+218 #endif
+Riallineamento all'inizio del codice della patch
+
+284 #ifdef CKPT 
+285 		//NOTE: for the below code fragment you will need to have patches[i].code point to the copy of the original instruction - you will need to step forward other preceeding instructions forming the patch
+286 		#if MOD == 64
+287 		patches[i].code = patches[i].code + 37 + ckpt_code_size;
+288 		#elif MOD == 128 || MOD == 256
+289 		patches[i].code = patches[i].code + 47 + ckpt_code_size;
+290 		#endif
+291 #endif
+patches[i].code deve puntare all'istruzione originale quindi si proccede a puntare al termine della patch.
+
+343 #if CKPT
+344 		if (instructions[i].type == 'l') continue; // avoid apply patch to load instructions
+345 #endif
+Nella funzione void apply_patches(void) si evita l'applicazione delle patch alle istruzioni di load.
+
+In int __wrap_main(int argc, char ** argv):
+889 #ifdef CKPT
+890 	void *tls;
+891 #endif
+
+937 #ifdef CKPT
+938 	tls = tls_setup();
+939 	if (tls_setup() == NULL) {
+940         fprintf(stderr, "tls_setup failed\n");
+941         return EXIT_FAILURE;
+942     }
+943 #endif
+Setup del tls prima della passaggio al main reale.
+
+Makefile
+TARGET_FUNCTIONS="<test_checkpoint>"
+
+ADDITIONAL_FLAGS = -O3 -DCKPT -DAPPLY_PATCHES #-DVERBOSE
+-DCKPT invece di -DASM_PREAMBLE
+
+#CKPT FLAGS
+ALLOCATOR_AREA_SIZE=0x100000UL
+WRITES=950
+READS=50
+MOD=64
+CF=0
+Flag inseriti a supporto delle operazioni di test.
+
+compile-and-link: movm
+	export C_INCLUDE_PATH=$(PWD)/include; cd $(APP) ; make ALLOCATOR_AREA_SIZE=$(ALLOCATOR_AREA_SIZE) MOD=$(MOD) WRITES=$(WRITES) READS=$(READS) CF=$(CF) ; gcc $(APP_OBJ) $(LIB)/movm.o -o $(EXECUTABLE) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) $(LIBS) -Xlinker --wrap=main
+	objdump -Dw $(EXECUTABLE) > $(DISASSEMBLY)
+
+make di $(APP) con i flag ALLOCATOR_AREA_SIZE MOD WRITES READS CF
+
+checks:
+	@if [ -d $(APP) ]; then echo ""; else echo "application directory does not exist" ; exit 1; fi
+	@./scripts/file-existence.sh $(APP) $(TARGET_MODULES)
+	@echo "PLEASE for any compiling error run 'make restore-files'\n"
+
+	@if [ ! -d $(OBJ) ]; then mkdir -p $(OBJ); fi
+	@if [ ! -d $(LIB) ]; then mkdir -p $(LIB); fi
+
+Verifice e creazione in caso di assenza delle directory $(OBJ) e $(LIB)
+
+asm-patch:
+	cd ./src; gcc _asm_patches.S -c -I$(INCLUDE) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) -DALLOCATOR_AREA_SIZE=$(ALLOCATOR_AREA_SIZE) -DMOD=$(MOD) -o $(OBJ)/_asm_patches.o
+	objdump -Dw $(OBJ)/_asm_patches.o > $(TEMP)/disassembly_asm_patch 
+
+Introduzione dei flag ALLOCATOR_AREA_SIZE e MOD in fase di compilazione. Disassemblaggio di _asm_patch.o per facilitare l'acquisizione della size di ckpt_assempbly.
+
+patch:
+	cd ./patches; gcc patches.c -c -I$(INCLUDE) $(THE_VM) $(UDTEMPDIR) $(UDTEMPFILE) $(UDTEMPOBJ) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) -DMOD=$(MOD) -o $(OBJ)/_patches.o
+#please rember to insert whatever Makefile in the user-defined directory
+	cd $(USER_DEFINED); make
+
+Introduzione del flag MOD per la compilazione di patches.c .
+
+movm: base head startup asm-patch patch tls
+	cd ./src; gcc _elf_parse.c -c $(TEMPDIR) $(TEMPFILE) $(DISASSEMBLY_FILE) $(TEMPOBJ) $(TF) $(THE_VM) -I$(INCLUDE) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) -DMOD=$(MOD) -o $(OBJ)/_elf_parse.o
+	cd $(OBJ) ; ld -i *.o -o $(LIB)/movm.o
+
+Introduzione del flag MOD per la compilazione di _elf_parse.c .

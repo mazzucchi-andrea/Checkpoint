@@ -5,4 +5,4 @@ MOD=64
 CF=0
 
 all:
-	gcc -c prog.c -mavx -funroll-loops -pie -fPIE -I ../include -DALLOCATOR_AREA_SIZE=$(ALLOCATOR_AREA_SIZE) -DWRITES=$(WRITES) -DREADS=$(READS) -DCF=$(CF) -DMOD=$(MOD)
+	gcc -c prog.c -mavx -pie -fPIE -I ../include -DALLOCATOR_AREA_SIZE=$(ALLOCATOR_AREA_SIZE) -DWRITES=$(WRITES) -DREADS=$(READS) -DCF=$(CF) -DMOD=$(MOD)

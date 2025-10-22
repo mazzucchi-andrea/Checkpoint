@@ -46,9 +46,9 @@ ADDITIONAL_FLAGS = -O3 -DCKPT -DAPPLY_PATCHES #-DVERBOSE
 
 #CKPT FLAGS
 ALLOCATOR_AREA_SIZE=0x100000UL
-WRITES=1000
-READS=0
-MOD=256
+WRITES=950
+READS=50
+MOD=64
 CF=0
 
 
@@ -57,7 +57,6 @@ THE_VM = -DVM_NAME=\"MVM\"
 all: checks backup-files file-rewriting compile-and-link restore-files
 
 compile-and-link: movm
-	@echo Compile prog with $(WRITES) writes and $(READS) reads
 	export C_INCLUDE_PATH=$(PWD)/include; cd $(APP) ; make ALLOCATOR_AREA_SIZE=$(ALLOCATOR_AREA_SIZE) MOD=$(MOD) WRITES=$(WRITES) READS=$(READS) CF=$(CF) ; gcc $(APP_OBJ) $(LIB)/movm.o -o $(EXECUTABLE) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) $(LIBS) -Xlinker --wrap=main
 	objdump -Dw $(EXECUTABLE) > $(DISASSEMBLY) 
 
@@ -105,4 +104,4 @@ file-rewriting:
 	export MVM_TEMP_FILE=$(TEMP)/__temp_file ; ./scripts/file-processor.sh $(APP) $(TARGET_MODULES)
 
 clean:
-	rm -rf *.o ; rm $(EXECUTABLE)
+	find . -name "*.o" -type f -delete ; rm -f $(EXECUTABLE)

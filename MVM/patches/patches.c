@@ -6,6 +6,9 @@
 #include <fcntl.h>
 #include "elf_parse.h"
 
+#ifndef MEM_SIZE
+#define MEM_SIZE 0x100000UL
+#endif
 
 void the_patch (unsigned long, unsigned long) __attribute__((used));
 
@@ -67,9 +70,10 @@ void user_defined(instruction_record * actual_instruction, patch * actual_patch)
 	//here is stuff used for instrumenting applications in "PARSIR ubiquitous" 
 	//it replicates memory updates that are executed on malloc-ed/mmap-ed 
 	//memory areas at a given distance which is here set to 2^{21}
-	int offset = 0x200000;
-        char * offset_string = "0x200000";
-        char * aux;
+	int offset = MEM_SIZE;
+	char offset_string[16];
+	sprintf(offset_string, "0x%x", offset);
+	char * aux;
 
 
 	//check if the instructon is a non RIP-relative store 

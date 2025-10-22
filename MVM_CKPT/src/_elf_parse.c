@@ -14,8 +14,10 @@
 
 
 void user_defined(instruction_record *, patch *);
+#if CKPT
 void ckpt_patch(instruction_record *, patch *);
 void save_regs_tls(patch *);
+#endif
 
 
 uint64_t asl_randomization = 0;
@@ -38,9 +40,11 @@ uint64_t intermediate_flags[SIZE];
 int intermediate_zones_index = -1;
 
 void audit_block(instruction_record *the_record){
-	if (the_record->type == 'l') { //avoid audit of load instruction
+#if CKPT
+	if (the_record->type == 'l') { //avoid audit of load instruction in ckpt
 		return;
 	}
+#endif
 	printf("instruction record:\n \
 			belonging function is %s\n \
 			address is %p\n \
@@ -124,17 +128,21 @@ void build_patches(void){
 	uint64_t test_code = (uint64_t)the_patch_assembly;
 	int test_code_size = 0x1;	//this is taken from the compiled version of the src/_asm_patch.S file
 
+#if CKPT 
 	uint64_t ckpt_code = (uint64_t)ckpt_assembly;
 #if MOD == 64
 	int ckpt_code_size = 0xbe;	//this is taken from the compiled version of the src/_asm_patch.S file
 #elif MOD == 128 || MOD == 256
 	int ckpt_code_size = 0xd4;	//this is taken from the compiled version of the src/_asm_patch.S file
 #endif
+#endif
 
 	patches = (patch*)address1;
 
 	for (i=0;i<target_instructions;i++){
+		#if CKPT
 		if (instructions[i].type == 'l') continue; // avoid patch of load instruction
+		#endif
 
 		//saving original instruction address
 		instruction_address = patches[i].original_instruction_address = instructions[i].address;
@@ -191,7 +199,7 @@ void build_patches(void){
 		#endif
 
 		ckpt_patch(&instructions[i], &patches[i]);
-		patches[i].code = patches[i].code + 10;//10 is the mazimum size of the lea instruction
+		patches[i].code = patches[i].code + 10;// 10 is the mazimum size of the lea instruction
 		memcpy((char*)(patches[i].code),(char*)(ckpt_code),ckpt_code_size);
 		patches[i].code = patches[i].code + ckpt_code_size;
 #endif
@@ -332,7 +340,9 @@ void apply_patches(void){
 	unsigned short instruction_short_patch;
 
 	for (i=0;i<target_instructions;i++){
+#if CKPT
 		if (instructions[i].type == 'l') continue; // avoid apply patch to load instructions
+#endif
 		size = instructions[i].size;
 		instruction_address = instructions[i].address;
 		AUDIT

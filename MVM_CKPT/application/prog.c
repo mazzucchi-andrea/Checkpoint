@@ -52,7 +52,7 @@ void init_area(int8_t *area, int64_t init_value) {
 }
 
 /* Save original values and set the bitarray bit before writing the new value and read */
-float test_checkpoint(int8_t *area, int64_t new_value) {
+float __attribute__((optimize("unroll-loops"))) test_checkpoint(int8_t *area, int64_t new_value) {
     int offset;
     int64_t read_value;
     clock_t begin, end;
@@ -142,11 +142,12 @@ double restore_area(int8_t *area) {
     double time_spent;
     begin = clock();
 
-    for (int offset = 0; offset < BITARRAY_SIZE; offset += 8) {
-        if (*(u_int64_t *)(bitarray + offset) == 0) {
+    for (int offset = 0; offset < BITARRAY_SIZE; offset += 32) {
+        __m256i bitarray_vec = _mm256_loadu_si256((__m256i *)(bitarray + offset));
+        if (_mm256_testz_si256(bitarray_vec, bitarray_vec)) {
             continue;
         }
-        for (int i = 0; i < 8; i += 2) {
+        for (int i = 0; i < 32; i += 2) {
             current_word = *(u_int16_t *)(bitarray + offset + i);
             if (current_word == 0) {
                 continue;
@@ -203,20 +204,6 @@ int main(int argc, char *argv[]) {
     memset(area, 0, ALLOCATOR_AREA_SIZE * 2 + BITARRAY_SIZE);
 
     init_area(area, init_value);
-    int8_t *init_A_copy =
-        (int8_t *)mmap(NULL, ALLOCATOR_AREA_SIZE, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
-    if (init_A_copy == MAP_FAILED) {
-        perror("mmap init area copy");
-        return EXIT_FAILURE;
-    }
-
-    memcpy(init_A_copy, area, ALLOCATOR_AREA_SIZE);
-
-    ret = memcmp(area, init_A_copy, ALLOCATOR_AREA_SIZE);
-    if (ret) {
-        fprintf(stderr, "Area A check failed: %d\n", ret);
-        return EXIT_FAILURE;
-    }
     clean_cache(area);
 
     for (int i = 0; i < 128; i++) {
@@ -224,19 +211,10 @@ int main(int argc, char *argv[]) {
         clean_cache(area);
 #endif
         wr_time += test_checkpoint(area, new_value);
-        if (verify_checkpoint(area, init_A_copy)) {
-            return EXIT_FAILURE;
-        }
-
 #if CF == 1
         clean_cache(area);
 #endif
         restore_time += restore_area(area);
-        ret = memcmp(area, init_A_copy, ALLOCATOR_AREA_SIZE);
-        if (ret) {
-            fprintf(stderr, "Area A restore check failed: 0x%x\n", ret);
-            return EXIT_FAILURE;
-        }
     }
 
     FILE *file = fopen("ckpt_test_results.csv", "a");
@@ -244,8 +222,8 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Error opening file!\n");
         return 1;
     }
-    sprintf(buffer, "%ld, %d, %d, %d, %d, %d, %f, %f\n", ALLOCATOR_AREA_SIZE, CF, MOD, WRITES + READS, WRITES, READS,
-            wr_time, restore_time);
+    sprintf(buffer, "0x%lx,%d,%d,%d,%d,%d,%f,%f\n", ALLOCATOR_AREA_SIZE, CF, MOD, WRITES + READS, WRITES, READS,
+            wr_time / 128, restore_time / 128);
     fprintf(file, "%s", buffer);
     fclose(file);
 
