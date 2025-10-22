@@ -16,11 +16,11 @@ jobs:
       - name: Tests
         run: bash tests.sh
       - name: Create staging directory for Graphs and CSVs
-        run: mkdir staging &
+        run: mkdir staging
       - name: Copy graphs
-        run: cp Checkpoint/graphs staging
+        run: cp graphs staging
       - name: Copy CSV 
-        run: cp Checkpoint/combined_test_results.csv staging
+        run: cp combined_test_results.csv staging
       - uses: actions/upload-artifact@v4
         with:
           name: Package
