@@ -2,6 +2,8 @@
 
 #include <emmintrin.h> // SSE2
 
+#include <immintrin.h> // AVX
+
 #include <linux/limits.h>
 
 #include <stdbool.h>
@@ -261,11 +263,12 @@ void restore_area(int8_t *area) {
     double time_spent;
     begin = clock();
 
-    for (int offset = 0; offset < BITARRAY_SIZE; offset += 8) {
-        if (*(u_int64_t *)(bitarray + offset) == 0) {
+     for (int offset = 0; offset < BITARRAY_SIZE; offset += 32) {
+        __m256i bitarray_vec = _mm256_loadu_si256((__m256i *)(bitarray + offset));
+        if (_mm256_testz_si256(bitarray_vec, bitarray_vec)) {
             continue;
         }
-        for (int i = 0; i < 8; i += 2) {
+        for (int i = 0; i < 32; i += 2) {
             current_word = *(u_int16_t *)(bitarray + offset + i);
             if (current_word == 0) {
                 continue;
