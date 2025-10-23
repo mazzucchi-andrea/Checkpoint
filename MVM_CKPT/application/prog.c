@@ -44,15 +44,8 @@
 #define BITARRAY_SIZE ALLOCATOR_AREA_SIZE / 32
 #endif
 
-/* Initialize the area with the given quadword */
-void init_area(int8_t *area, int64_t init_value) {
-    for (int i = 0; i < (ALLOCATOR_AREA_SIZE - 8); i += 8) {
-        *(int64_t *)(area + i) = init_value;
-    }
-}
-
 /* Save original values and set the bitarray bit before writing the new value and read */
-float __attribute__((optimize("unroll-loops"))) test_checkpoint(int8_t *area, int64_t new_value) {
+float __attribute__((optimize("unroll-loops"))) test_checkpoint(int8_t *area, int64_t value) {
     int offset;
     int64_t read_value;
     clock_t begin, end;
@@ -60,7 +53,7 @@ float __attribute__((optimize("unroll-loops"))) test_checkpoint(int8_t *area, in
     begin = clock();
     for (int i = 0; i < WRITES; i += 4) {
         offset = i % (ALLOCATOR_AREA_SIZE - 8 + 1);
-        *(int64_t *)(area + offset) = new_value;
+        *(int64_t *)(area + offset) = value;
     }
     for (int i = 0; i < READS; i++) {
         offset = i % (ALLOCATOR_AREA_SIZE - 8 + 1);
@@ -69,67 +62,6 @@ float __attribute__((optimize("unroll-loops"))) test_checkpoint(int8_t *area, in
     end = clock();
     time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
     return time_spent;
-}
-
-/* Verify that the set bits correspond to the correctly saved quadwords. */
-int verify_checkpoint(int8_t *area, int8_t *init_A_copy) {
-    int8_t *bitarray = area + ALLOCATOR_AREA_SIZE * 2;
-    int8_t *areaS = area + ALLOCATOR_AREA_SIZE;
-    for (int offset = 0; offset < BITARRAY_SIZE; offset += 2) {
-        u_int16_t current_word = *(u_int16_t *)(bitarray + offset);
-        if (current_word == 0) {
-            continue;
-        }
-        for (int k = 0; k < 16; k++) {
-            if ((current_word >> k) & 1) {
-#if MOD == 64
-                int target_offset = (offset * 8 + k) * 8;
-                if (*(u_int64_t *)(init_A_copy + target_offset) != *(u_int64_t *)(areaS + target_offset)) {
-                    fprintf(stderr,
-                            "Checkpoint verify failed:\n"
-                            "Offset 0x%x\n"
-                            "Area S value: 0x%lx\n"
-                            "Area A init Value: 0x%lx\n",
-                            offset, *(u_int64_t *)(areaS + target_offset), *(u_int64_t *)(init_A_copy + target_offset));
-                    return -1;
-#elif MOD == 128
-                int target_offset = (offset * 8 + k) * 16;
-                if (*(__int128 *)(init_A_copy + target_offset) != *(__int128 *)(areaS + target_offset)) {
-                    fprintf(stderr,
-                            "Checkpoint verify failed:\n"
-                            "BitArray Word Offset: 0x%x\n"
-                            "Bit: %d\n"
-                            "Target Offset: %d\n"
-                            "Area S Value: First qword: 0x%lx Second qword: 0x%lx\n"
-                            "Area A init Value First qword: 0x%lx Second qword: 0x%lx\n",
-                            offset, k, target_offset, *(int64_t *)(areaS + target_offset),
-                            *(int64_t *)(areaS + target_offset + 8), *(int64_t *)(init_A_copy + target_offset),
-                            *(int64_t *)(init_A_copy + target_offset + 8));
-                    return -1;
-#elif MOD == 256
-                int target_offset = (offset * 8 + k) * 32;
-                if (memcmp(init_A_copy + target_offset, areaS + target_offset, 32)) {
-                    fprintf(
-                        stderr,
-                        "Checkpoint verify failed:\n"
-                        "BitArray Word Offset: 0x%x\n"
-                        "Bit: %d\n"
-                        "Target Offset: %d\n"
-                        "Area S Value: First qword: 0x%lx Second qword: 0x%lx Third qword: 0x%lx Fourth qword: 0x%lx\n"
-                        "Area A init Value First qword: 0x%lx Second qword: 0x%lx Third qword: 0x%lx Fourth qword: "
-                        "0x%lx\n",
-                        offset, k, target_offset, *(int64_t *)(areaS + target_offset),
-                        *(int64_t *)(areaS + target_offset + 8), *(int64_t *)(areaS + target_offset + 16),
-                        *(int64_t *)(areaS + target_offset + 24), *(int64_t *)(init_A_copy + target_offset),
-                        *(int64_t *)(init_A_copy + target_offset + 8), *(int64_t *)(init_A_copy + target_offset + 16),
-                        *(int64_t *)(init_A_copy + target_offset + 24));
-                    return -1;
-#endif
-                }
-            }
-        }
-    }
-    return 0;
 }
 
 double restore_area(int8_t *area) {
@@ -188,11 +120,10 @@ int main(int argc, char *argv[]) {
     char buffer[1024];
     char *endptr;
     int ret;
-    int64_t init_value, new_value;
+    int64_t value;
 
     srand(42);
-    init_value = rand() % (0xFFFFFFFFFFFFFFFF - 1 + 1) + 1;
-    new_value = rand() % (0xFFFFFFFFFFFFFFFF - 1 + 1) + 1;
+    value = rand() % (0xFFFFFFFFFFFFFFFF - 1 + 1) + 1;
 
     size_t alignment = 8 * (1024 * ALLOCATOR_AREA_SIZE);
     int8_t *area = (int8_t *)aligned_alloc(alignment, ALLOCATOR_AREA_SIZE * 2 + BITARRAY_SIZE);
@@ -200,17 +131,14 @@ int main(int argc, char *argv[]) {
         perror("aligned_alloc failed\n");
         return EXIT_FAILURE;
     }
-
     memset(area, 0, ALLOCATOR_AREA_SIZE * 2 + BITARRAY_SIZE);
-
-    init_area(area, init_value);
     clean_cache(area);
 
     for (int i = 0; i < 128; i++) {
 #if CF == 1
         clean_cache(area);
 #endif
-        wr_time += test_checkpoint(area, new_value);
+        wr_time += test_checkpoint(area, value);
 #if CF == 1
         clean_cache(area);
 #endif

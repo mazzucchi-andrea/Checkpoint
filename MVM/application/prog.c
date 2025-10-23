@@ -24,14 +24,7 @@
 #define CF 0
 #endif
 
-/* Initialize the area with the given quadword */
-void init_area(int8_t *area, int64_t init_value) {
-    for (int i = 0; i < (MEM_SIZE - 8); i += 8) {
-        *(int64_t *)(area + i) = init_value;
-    }
-}
-
-float __attribute__((optimize("unroll-loops"))) function(int8_t *area, int64_t new_value) {
+float __attribute__((optimize("unroll-loops"))) function(int8_t *area, int64_t value) {
     int offset;
     int64_t read_value;
     clock_t begin, end;
@@ -39,7 +32,7 @@ float __attribute__((optimize("unroll-loops"))) function(int8_t *area, int64_t n
     begin = clock();
     for (int i = 0; i < WRITES; i += 4) {
         offset = i % (MEM_SIZE - 8 + 1);
-        *(int64_t *)(area + offset) = new_value;
+        *(int64_t *)(area + offset) = value;
     }
     for (int i = 0; i < READS; i++) {
         offset = i % (MEM_SIZE - 8 + 1);
@@ -62,29 +55,25 @@ int main(int argc, char **argv) {
     char buffer[1024];
     char *endptr;
     int ret;
-    int64_t init_value, new_value;
+    int64_t value;
 
     srand(42);
-    init_value = rand() % (0xFFFFFFFFFFFFFFFF - 1 + 1) + 1;
-    new_value = rand() % (0xFFFFFFFFFFFFFFFF - 1 + 1) + 1;
+    value = rand() % (0xFFFFFFFFFFFFFFFF - 1 + 1) + 1;
 
-    size_t alignment = 8 * (1024 * MEM_SIZE * 2);
+    size_t alignment = 8 * (1024 * MEM_SIZE);
     int8_t *area = (int8_t *)aligned_alloc(alignment, MEM_SIZE * 2);
     if (area == NULL) {
         perror("aligned_alloc failed\n");
         return EXIT_FAILURE;
     }
-
     memset(area, 0, MEM_SIZE);
-
-    init_area(area, init_value);
     clean_cache(area);
 
     for (int i = 0; i < 128; i++) {
 #if CF == 1
         clean_cache(area);
 #endif
-        time += function(area, new_value);
+        time += function(area, value);
     }
 
     FILE *file = fopen("mvm_test_results.csv", "a");

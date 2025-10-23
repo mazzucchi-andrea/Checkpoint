@@ -24,13 +24,6 @@
 #define CF 0
 #endif
 
-/* Initialize the area with the given quadword */
-void init_area(int8_t *area, int64_t init_value) {
-    for (int i = 0; i < (SIZE - 8); i += 8) {
-        *(int64_t *)(area + i) = init_value;
-    }
-}
-
 /* Save original values and set the bitarray bit before writing the new value and read */
 float __attribute__((optimize("unroll-loops"))) test_checkpoint(int8_t *area, int8_t *area_copy, int64_t new_value) {
     int offset;
@@ -74,11 +67,10 @@ int main(int argc, char *argv[]) {
     char buffer[1024];
     char *endptr;
     int ret;
-    int64_t init_value, new_value;
+    int64_t value;
 
     srand(42);
-    init_value = rand() % (0xFFFFFFFFFFFFFFFF - 1 + 1) + 1;
-    new_value = rand() % (0xFFFFFFFFFFFFFFFF - 1 + 1) + 1;
+    value = rand() % (0xFFFFFFFFFFFFFFFF - 1 + 1) + 1;
 
     size_t alignment = 8 * (1024 * SIZE);
     int8_t *area = (int8_t *)aligned_alloc(alignment, SIZE);
@@ -91,18 +83,15 @@ int main(int argc, char *argv[]) {
         perror("aligned_alloc failed\n");
         return EXIT_FAILURE;
     }
-
     memset(area, 0, SIZE);
     memset(area_copy, 0, SIZE);
-
-    init_area(area, init_value);
     clean_cache(area);
 
     for (int i = 0; i < 128; i++) {
 #if CF == 1
         clean_cache(area);
 #endif
-        wr_time += test_checkpoint(area, area_copy, new_value);
+        wr_time += test_checkpoint(area, area_copy, value);
 #if CF == 1
         clean_cache(area);
 #endif
