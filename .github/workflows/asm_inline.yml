@@ -14,7 +14,5 @@ jobs:
         working-directory: ./asm_inline
     steps:
       - uses: actions/checkout@v4
-      - name: Run All Tests
-        run: make all
-      - name: Clean
-        run: make clean
+      - name: Tests
+        run: bash tests.sh

@@ -23,13 +23,17 @@
 #endif
 
 #ifndef MOD
-#define MOD 64
+#define MOD 512
 #endif
 
 #if MOD == 64
 #define BITARRAY_SIZE SIZE / 8
 #elif MOD == 128
 #define BITARRAY_SIZE SIZE / 16
+#elif MOD == 256
+#define BITARRAY_SIZE SIZE / 32
+#else
+#define BITARRAY_SIZE SIZE / 64
 #endif
 
 #define STR1(x) #x
@@ -41,7 +45,13 @@ void checkpoint(int8_t *area);
 
 void *tls_setup() {
     unsigned long addr;
-    addr = (unsigned long)mmap(NULL, 64, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
+    size_t size;
+#if MOD == 512
+    size = 128;
+#else
+    size = 64;
+#endif
+    addr = (unsigned long)mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
     *(unsigned long *)addr = addr;
     if (arch_prctl(ARCH_SET_GS, addr)) {
         return NULL;
@@ -52,27 +62,79 @@ void *tls_setup() {
 inline void checkpoint(int8_t *area) {
 
 __asm__ __inline__(
-#if MOD == 64
         "mov %%rax, %%gs:0;"
         "mov %%rbx, %%gs:8;"
         "mov %%rcx, %%gs:16;"
+#if MOD == 128
+        "movdqu %%xmm1, %%gs:24;"
+#elif MOD == 256
+        "vmovdqu %%ymm1, %%gs:24;"
+#elif MOD == 512
+        "vmovdqu64 %%zmm1, %%gs:24;"
+#endif
         "mov %%rax, %%rcx;"
         "and $0xffffffffffc00000,%%rcx;"
         "and $0x3fffff, %%rax;"
+#if MOD == 64
         "test $7, %%rax;"
         "jz second_qword;"
         "and $0x7ffff8, %%rax;"
         "shr $3, %%rax;"
+#elif MOD == 128
+        "mov %%rax, %%rbx;"
+        "and $0x7ffff0, %%rax;"
+        "and $15, %%rbx;"
+        "cmp $8, %%rbx;"
+        "jb second_dqword;"
+        "shr $4, %%rax;"
+#elif MOD == 256
+        "mov %%rax, %%rbx;"
+        "and $0x7fffe0, %%rax;"
+        "and $31, %%rbx;"
+        "cmp $24, %%rbx;"
+        "jz second_256bit;"
+        "shr $5, %%rax;"
+#else
+        "mov %%rax, %%rbx;"
+        "and $0x7fffc0, %%rax;"
+        "and $63, %%rbx;"
+        "cmp $55, %%rbx;"
+        "jz second_512bit;"
+        "shr $6, %%rax;"
+#endif
         "mov %%rax, %%rbx;"
         "and $15, %%rbx;"
         "shr $4, %%rax;"
         "bts %%bx, " STR(2 * SIZE) "(%%rcx, %%rax, 2);"
+#if MOD == 64
         "jc next_qword;"
+#elif MOD == 128
+        "jc next_dqword;"
+#elif MOD == 256
+        "jc next_256bit;"
+#else
+        "jc next_512bit;"
+#endif
         "shl $4, %%rax;"
         "add %%rbx, %%rax;"
+#if MOD == 64
         "mov (%%rcx, %%rax, 8), %%rbx;"
         "mov %%rbx, " STR(SIZE) "(%%rcx, %%rax, 8);"
+#elif MOD == 128
+        "shl $4, %%rax;"
+        "movdqu (%%rcx, %%rax,), %%xmm1;"
+        "movdqu %%xmm1, " STR(SIZE)"(%%rcx, %%rax,);"
+#elif MOD == 256
+        "shl $5, %%rax;"
+        "vmovdqu (%%rcx, %%rax,), %%ymm1;"
+        "vmovdqu %%ymm1, " STR(SIZE)"(%%rcx, %%rax,);"
+#else
+        "shl $6, %%rax;"
+        "vmovdqu64 (%%rcx, %%rax,), %%zmm1;"
+        "vmovdqu64 %%zmm1, " STR(SIZE)"(%%rcx, %%rax,);"
+#endif
         "jmp check_last;"
+#if MOD == 64
     "next_qword:"
         "shl $4, %%rax;"
         "add %%rbx, %%rax;"
@@ -83,46 +145,8 @@ __asm__ __inline__(
         "jge end;"
     "second_qword:"
         "shr $3, %%rax;"
-        "mov %%rax, %%rbx;"
-        "and $15, %%rbx;"
-        "shr $4, %%rax;"
-        "bts %%bx, " STR(2 * SIZE) "(%%rcx, %%rax, 2);"
-        "jc end;"
-        "shl $4, %%rax;"
-        "add %%rbx, %%rax;"
-        "mov (%%rcx, %%rax, 8), %%rbx;"
-        "mov %%rbx, " STR(SIZE) "(%%rcx, %%rax, 8);"
-    "end:"
-        "mov %%gs:0, %%rax;"
-        "mov %%gs:8, %%rbx;"
-        "mov %%gs:16, %%rcx;"
-        :
-        : "a"(area)
-        : "rbx", "rcx", "memory"
 #elif MOD == 128
-        "mov %%rax, %%gs:0;"
-        "mov %%rbx, %%gs:8;"
-        "mov %%rcx, %%gs:16;"
-        "movdqu %%xmm1, %%gs:24;"
-        "mov %%rax, %%rcx;"
-        "and $0xffffffffffc00000,%%rcx;"
-        "and $0x3fffff, %%rax;"
-        "test $15, %%rax;"
-        "jz second_dqword;"
-        "and $0x7ffff0, %%rax;"
-        "shr $4, %%rax;"
-        "mov %%rax, %%rbx;"
-        "and $15, %%rbx;"
-        "shr $4, %%rax;"
-        "bts %%bx, " STR(2 * SIZE)"(%%rcx, %%rax, 2);"
-        "jc next_qword;"
-        "shl $4, %%rax;"
-        "add %%rbx, %%rax;"
-        "shl $4, %%rax;"
-        "movdqu (%%rcx, %%rax,), %%xmm1;"
-        "movdqu %%xmm1, " STR(SIZE)"(%%rcx, %%rax,);"
-        "jmp check_last;"
-    "next_qword:"
+    "next_dqword:"
         "shl $4, %%rax;"
         "add %%rbx, %%rax;"
         "shl $4, %%rax;"
@@ -132,24 +156,75 @@ __asm__ __inline__(
         "jge end;"
     "second_dqword:"
         "shr $4, %%rax;"
+#elif MOD == 256
+    "next_256bit:"
+        "shl $4, %%rax;"
+        "add %%rbx, %%rax;"
+        "shl $5, %%rax;"
+    "check_last:"
+        "add $32, %%rax;"
+        "cmp $" STR(SIZE) ", %%rax;"
+        "jge end;"
+    "second_256bit:"
+        "shr $5, %%rax;"
+#else
+    "next_512bit:"
+        "shl $4, %%rax;"
+        "add %%rbx, %%rax;"
+        "shl $6, %%rax;"
+    "check_last:"
+        "add $64, %%rax;"
+        "cmp $" STR(SIZE) ", %%rax;"
+        "jge end;"
+    "second_512bit:"
+        "shr $6, %%rax;"
+#endif
         "mov %%rax, %%rbx;"
         "and $15, %%rbx;"
         "shr $4, %%rax;"
-        "bts %%bx, " STR(2 * SIZE)"(%%rcx, %%rax, 2);"
+        "bts %%bx, " STR(2 * SIZE) "(%%rcx, %%rax, 2);"
         "jc end;"
         "shl $4, %%rax;"
         "add %%rbx, %%rax;"
+#if MOD == 64
+        "mov (%%rcx, %%rax, 8), %%rbx;"
+        "mov %%rbx, " STR(SIZE) "(%%rcx, %%rax, 8);"
+#elif MOD == 128
         "shl $4, %%rax;"
         "movdqu (%%rcx, %%rax,), %%xmm1;"
-        "movdqu %%xmm1, " STR(SIZE) "(%%rcx, %%rax,);"
+        "movdqu %%xmm1, " STR(SIZE)"(%%rcx, %%rax,);"
+#elif MOD == 256
+        "shl $5, %%rax;"
+        "vmovdqu (%%rcx, %%rax,), %%ymm1;"
+        "vmovdqu %%ymm1, " STR(SIZE) "(%%rcx, %%rax,);"
+#else
+        "shl $6, %%rax;"
+        "vmovdqu64 (%%rcx, %%rax,), %%zmm1;"
+        "vmovdqu64 %%zmm1, " STR(SIZE)"(%%rcx, %%rax,);"  
+#endif
     "end:"
         "mov %%gs:0, %%rax;"
         "mov %%gs:8, %%rbx;"
         "mov %%gs:16, %%rcx;"
+#if MOD == 64
+        :
+        : "a"(area)
+        : "rbx", "rcx", "memory"
+#elif MOD == 128
         "movdqu %%gs:24, %%xmm1;"
         :
         : "a"(area)
         : "rbx", "rcx", "xmm1", "memory"
+#elif MOD == 256
+        "vmovdqu %%gs:24, %%ymm1;"
+        :
+        : "a"(area)
+        : "rbx", "rcx", "ymm1", "memory"
+#else
+        "vmovdqu64 %%gs:24, %%zmm1;"
+        :
+        : "a"(area)
+        : "rbx", "rcx", "zmm1", "memory"
 #endif
 );
 }
@@ -246,6 +321,36 @@ int verify_checkpoint(int8_t *area, int8_t *init_A_copy) {
                             *(int64_t *)(init_A_copy + target_offset + 8));
                     return -1;
                 }
+#elif MOD == 256
+                int target_offset = (offset * 8 + k) * 32;
+                if (memcmp(init_A_copy + target_offset, areaS + target_offset, 32)) {
+                    fprintf(
+                        stderr,
+                        "Checkpoint verify failed:\n"
+                        "BitArray Word Offset: 0x%x\n"
+                        "Bit: %d\n"
+                        "Target Offset: %d\n"
+                        "Area S Value: First qword: 0x%lx Second qword: 0x%lx Third qword: 0x%lx Fourth qword: 0x%lx\n"
+                        "Area A init Value First qword: 0x%lx Second qword: 0x%lx Third qword: 0x%lx Fourth qword: "
+                        "0x%lx\n",
+                        offset, k, target_offset, *(int64_t *)(areaS + target_offset),
+                        *(int64_t *)(areaS + target_offset + 8), *(int64_t *)(areaS + target_offset + 16),
+                        *(int64_t *)(areaS + target_offset + 24), *(int64_t *)(init_A_copy + target_offset),
+                        *(int64_t *)(init_A_copy + target_offset + 8), *(int64_t *)(init_A_copy + target_offset + 16),
+                        *(int64_t *)(init_A_copy + target_offset + 24));
+                    return -1;
+                }
+#else
+                int target_offset = (offset * 8 + k) * 64;
+                if (memcmp(init_A_copy + target_offset, areaS + target_offset, 64)) {
+                    fprintf(stderr,
+                            "Checkpoint verify failed:\n"
+                            "BitArray Word Offset: 0x%x\n"
+                            "Bit: %d\n"
+                            "Target Offset: %d\n",
+                            offset, k, target_offset);
+                    return -1;
+                }
 #endif
             }
         }
@@ -263,7 +368,7 @@ void restore_area(int8_t *area) {
     double time_spent;
     begin = clock();
 
-     for (int offset = 0; offset < BITARRAY_SIZE; offset += 32) {
+    for (int offset = 0; offset < BITARRAY_SIZE; offset += 32) {
         __m256i bitarray_vec = _mm256_loadu_si256((__m256i *)(bitarray + offset));
         if (_mm256_testz_si256(bitarray_vec, bitarray_vec)) {
             continue;
@@ -280,7 +385,16 @@ void restore_area(int8_t *area) {
                     *(u_int64_t *)(dst + target_offset) = *(u_int64_t *)(src + target_offset);
 #elif MOD == 128
                     target_offset = ((offset + i) * 8 + k) * 16;
-                        *(__int128 *)(dst + target_offset) = *(__int128 *)(src + target_offset);
+                    *(__int128 *)(dst + target_offset) = *(__int128 *)(src + target_offset);
+#elif MOD == 256
+                    target_offset = ((offset + i) * 8 + k) * 32;
+                    __m256i ckpt_value = _mm256_loadu_si256((__m256i *)(src + target_offset));
+                    _mm256_storeu_si256((__m256i *)(dst + target_offset), ckpt_value);
+#else               
+                    target_offset = ((offset + i) * 8 + k) * 64;
+                    __m512i ckpt_value = _mm512_load_si512((void *)(src + target_offset));
+                    _mm512_storeu_si512((void *)(dst + target_offset), ckpt_value);  
+                    
 #endif
                 }
             }
@@ -356,15 +470,15 @@ int main(int argc, char *argv[]) {
     printf("BaseM: %p\n\n", area + 2 * SIZE);
 
     init_area(area, init_value);
-    int8_t *init_A_copy = (int8_t *)mmap(NULL, SIZE, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
-    if (init_A_copy == MAP_FAILED) {
+    int8_t *init_area_copy = (int8_t *)mmap(NULL, SIZE, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
+    if (init_area_copy == MAP_FAILED) {
         perror("mmap init area copy");
         return EXIT_FAILURE;
     }
 
-    memcpy(init_A_copy, area, SIZE);
+    memcpy(init_area_copy, area, SIZE);
 
-    ret = memcmp(area, init_A_copy, SIZE);
+    ret = memcmp(area, init_area_copy, SIZE);
     if (ret) {
         fprintf(stderr, "Area A check failed: %d\n", ret);
         return EXIT_FAILURE;
@@ -374,7 +488,7 @@ int main(int argc, char *argv[]) {
     clean_cache(area);
     test_checkpoint(area, first_value, numberOfWrites, numberOfReads);
 
-    if (verify_checkpoint(area, init_A_copy)) {
+    if (verify_checkpoint(area, init_area_copy)) {
         return EXIT_FAILURE;
     }
 
@@ -382,7 +496,7 @@ int main(int argc, char *argv[]) {
     clean_cache(area);
     test_checkpoint(area, second_value, numberOfWrites, numberOfReads);
 
-    if (verify_checkpoint(area, init_A_copy)) {
+    if (verify_checkpoint(area, init_area_copy)) {
         return EXIT_FAILURE;
     }
 
@@ -391,7 +505,7 @@ int main(int argc, char *argv[]) {
 
     restore_area(area);
 
-    ret = memcmp(area, init_A_copy, SIZE);
+    ret = memcmp(area, init_area_copy, SIZE);
     if (ret) {
         fprintf(stderr, "Area A restore check failed: 0x%x\n", ret);
         return EXIT_FAILURE;
