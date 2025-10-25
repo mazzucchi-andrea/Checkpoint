@@ -205,6 +205,8 @@ void save_regs_tls(patch *actual_patch) {
     u_int8_t instructions[27] = {
 #elif MOD == 128 || MOD == 256
     u_int8_t instructions[37] = {
+#else
+    u_int8_t instructions[39] = {
 #endif
         0x65, 0x48, 0x89, 0x04, 0x25, 0x00, 0x00, 0x00, 0x00, // mov %rax, %gs:0
         0x65, 0x48, 0x89, 0x1c, 0x25, 0x08, 0x00, 0x00, 0x00, // mov %rbx, %gs:8
@@ -215,11 +217,16 @@ void save_regs_tls(patch *actual_patch) {
 #elif MOD == 256
         ,
         0x65, 0xc5, 0xfe, 0x7f, 0x0c, 0x25, 0x18, 0x00, 0x00, 0x00 // vmovdqu %ymm1, %gs:24
+#elif MOD == 512
+        ,
+        0x65, 0x62, 0xf1, 0xfe, 0x48, 0x7f, 0x0c, 0x25, 0x18, 0x00, 0x00, 0x00 // vmovdqu64 %zmm1,%gs:0x18
 #endif
     };
 #if MOD == 64
     memcpy(actual_patch->code, (void *)instructions, 27);
 #elif MOD == 128 || MOD == 256
     memcpy(actual_patch->code, (void *)instructions, 37);
+#else
+    memcpy(actual_patch->code, (void *)instructions, 39);
 #endif
 }

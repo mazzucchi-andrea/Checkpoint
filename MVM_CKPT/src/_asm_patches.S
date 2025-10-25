@@ -96,22 +96,24 @@ end_checkpoint:
         mov %rax,%rcx
         and $0xffffffffffc00000, %rcx
         and $0x3fffff, %rax
-        test $15,%rax
-        jz second_qword
-        and $0x7ffff0,%rax
+        mov %rax, %rbx
+        and $0x7ffff0, %rax
+        and $15, %rbx
+        cmp $8, %rbx
+        jb second_dqword
         shr $4, %rax
         mov %rax, %rbx
         and $15, %rbx
         shr $4, %rax
         bts %bx, (2 *ALLOCATOR_AREA_SIZE)(%rcx, %rax, 2)
-        jc next_qword
+        jc next_dqword
         shl $4, %rax
         add %rbx, %rax
         shl $4, %rax
         movdqu (%rcx, %rax,), %xmm1
         movdqu %xmm1, ALLOCATOR_AREA_SIZE(%rcx, %rax,)
         jmp check_last
-next_qword:
+next_dqword:
         shl $4, %rax
         add %rbx, %rax
         shl $4, %rax
@@ -119,7 +121,7 @@ check_last:
         add $16, %rax
         cmp $ALLOCATOR_AREA_SIZE, %rax
         jge end_checkpoint
-second_qword:
+second_dqword:
         shr $4, %rax
         mov %rax, %rbx
         and $15, %rbx
@@ -144,7 +146,7 @@ end_checkpoint:
         mov %rax,%rcx
         and $0xffffffffffc00000, %rcx
         and $0x3fffff, %rax
-        test $15,%rax
+        test $31,%rax
         jz second_qword
         and $0x7fffe0,%rax
         shr $4, %rax
@@ -184,6 +186,56 @@ end_checkpoint:
         mov %gs:8, %rbx
         mov %gs:16, %rcx
         vmovdqu %gs:24, %ymm1
+	popf
+	lea 0x1000(%rsp),%rsp
+#else
+	lea -0x1000(%rsp),%rsp //this is for the stack red zone
+	pushf
+        mov %rax,%rcx
+        and $0xffffffffffc00000, %rcx
+        and $0x3fffff, %rax
+        mov %rax, %rbx
+        and $0x7fffc0, %rax
+        and $63, %rbx
+        cmp $55, %rbx
+        jz second_512bit
+        shr $6, %rax
+        mov %rax, %rbx
+        and $15, %rbx
+        shr $5, %rax
+        bts %bx, (2 *ALLOCATOR_AREA_SIZE)(%rcx, %rax, 2)
+        jc next_512bit
+        shl $4, %rax
+        add %rbx, %rax
+        shl $6, %rax
+        vmovdqu64 (%rcx, %rax,), %zmm1
+        vmovdqu64 %zmm1, ALLOCATOR_AREA_SIZE(%rcx, %rax,)
+        jmp check_last
+next_512bit:
+        shl $4, %rax
+        add %rbx, %rax
+        shl $6, %rax
+check_last:
+        add $64, %rax
+        cmp $ALLOCATOR_AREA_SIZE, %rax
+        jge end_checkpoint
+second_512bit:
+        shr $6, %rax
+        mov %rax, %rbx
+        and $15, %rbx
+        shr $4, %rax
+        bts %bx, (2 * ALLOCATOR_AREA_SIZE)(%rcx, %rax, 2)
+        jc end_checkpoint
+        shl $4, %rax
+        add %rbx, %rax
+        shl $6, %rax
+        vmovdqu64 (%rcx, %rax,), %zmm1
+        vmovdqu64 %zmm1, ALLOCATOR_AREA_SIZE(%rcx, %rax,)
+end_checkpoint:
+        mov %gs:0, %rax
+        mov %gs:8, %rbx
+        mov %gs:16, %rcx
+        vmovdqu64 %gs:24, %zmm1
 	popf
 	lea 0x1000(%rsp),%rsp
 #endif

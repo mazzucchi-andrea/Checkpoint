@@ -42,6 +42,8 @@
 #define BITARRAY_SIZE ALLOCATOR_AREA_SIZE / 16
 #elif MOD == 256
 #define BITARRAY_SIZE ALLOCATOR_AREA_SIZE / 32
+#else
+#define BITARRAY_SIZE ALLOCATOR_AREA_SIZE / 64
 #endif
 
 /* Save original values and set the bitarray bit before writing the new value and read */
@@ -96,6 +98,10 @@ double restore_area(int8_t *area) {
                     target_offset = ((offset + i) * 8 + k) * 32;
                     __m256i ckpt_value = _mm256_loadu_si256((__m256i *)(src + target_offset));
                     _mm256_storeu_si256((__m256i *)(dst + target_offset), ckpt_value);
+#else
+                    target_offset = ((offset + i) * 8 + k) * 64;
+                    __m512i ckpt_value = _mm512_load_si512((void *)(src + target_offset));
+                    _mm512_storeu_si512((void *)(dst + target_offset), ckpt_value);
 #endif
                 }
             }

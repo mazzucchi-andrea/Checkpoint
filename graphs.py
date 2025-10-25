@@ -71,9 +71,9 @@ for group_key in unique_groups_ckpt:
         group_df_mvm,
         how="left",
         left_on=["size", "cache_flush", "ops", "writes", "reads"],
-        right_on=["size", "cache_flush", "ops", "writes", "reads"]
+        right_on=["size", "cache_flush", "ops", "writes", "reads"],
     )
-    
+
     merged_df = pd.merge(
         merged_df,
         group_df_simple,
@@ -135,7 +135,7 @@ for group_key in unique_groups_ckpt:
     ax.set_ylabel("Time (s)")
 
     title = (
-        f"Time Comparison (MVM vs MVM_CKPT) for (size={size}, cache_flush={cache_flush}, "
+        f"Time Comparison for (size={size}, cache_flush={cache_flush}, "
         f"mod={mod}, ops={ops})"
     )
     ax.set_title(title, wrap=True)

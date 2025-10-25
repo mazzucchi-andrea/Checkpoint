@@ -35,7 +35,7 @@ cd MVM_CKPT
 rm ckpt_test_results.csv
 echo "size,cache_flush,mod,ops,writes,reads,ckpt_time,restore_time" > ckpt_test_results.csv
 
-for mod in 64 128 256;
+for mod in 64 128 256 512;
 do
     for s in ${size[@]};
     do
@@ -91,3 +91,4 @@ source .venv/bin/activate
 pip install -r requirements.txt
 rm combined_test_results.csv
 python graphs.py
+python mod_graphs.py
