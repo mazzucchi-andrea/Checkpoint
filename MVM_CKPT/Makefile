@@ -48,7 +48,7 @@ ADDITIONAL_FLAGS = -O3 -DCKPT -DAPPLY_PATCHES #-DVERBOSE
 ALLOCATOR_AREA_SIZE=0x100000UL
 WRITES=950
 READS=50
-MOD=128
+MOD=64
 CF=0
 
 
@@ -77,8 +77,8 @@ head:
 startup:
 	cd ./src; gcc _early_start.c -c -I$(INCLUDE) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) -o $(OBJ)/_early_start.o
 
-tls:
-	cd ./src; gcc _tls_setup.c -c -I$(INCLUDE) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) -o $(OBJ)/_tls_setup.o
+ckpt:
+	cd ./src; gcc _ckpt_setup.c -c -I$(INCLUDE) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) -DMOD=$(MOD) -o $(OBJ)/_ckpt_setup.o
 
 asm-patch:
 	cd ./src; gcc _asm_patches.S -c -I$(INCLUDE) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) -DALLOCATOR_AREA_SIZE=$(ALLOCATOR_AREA_SIZE) -DMOD=$(MOD) -o $(OBJ)/_asm_patches.o
@@ -89,7 +89,7 @@ patch:
 #please rember to insert whatever Makefile in the user-defined directory
 	cd $(USER_DEFINED); make
 
-movm: base head startup asm-patch patch tls
+movm: base head startup asm-patch patch ckpt
 	cd ./src; gcc _elf_parse.c -c $(TEMPDIR) $(TEMPFILE) $(DISASSEMBLY_FILE) $(TEMPOBJ) $(TF) $(THE_VM) -I$(INCLUDE) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) -DMOD=$(MOD) -o $(OBJ)/_elf_parse.o
 	cd $(OBJ) ; ld -i *.o -o $(LIB)/movm.o
 

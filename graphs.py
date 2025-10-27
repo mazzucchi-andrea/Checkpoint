@@ -18,12 +18,12 @@ unique_groups_ckpt = df_ckpt.groupby(group_cols_ckpt).groups.keys()
 
 if not os.path.exists("graphs"):
     os.makedirs("graphs")
-
-if not os.path.exists("graphs/cf_enabled"):
-    os.makedirs("graphs/cf_enabled")
-
-if not os.path.exists("graphs/cf_disabled"):
-    os.makedirs("graphs/cf_disabled")
+if not os.path.exists("graphs/ckpt_compare"):
+    os.makedirs("graphs/ckpt_compare")
+if not os.path.exists("graphs/ckpt_compare/cf_enabled"):
+    os.makedirs("graphs/ckpt_compare/cf_enabled")
+if not os.path.exists("graphs/ckpt_compare/cf_disabled"):
+    os.makedirs("graphs/ckpt_compare/cf_disabled")
 
 combined_csv = open("combined_test_results.csv", "w")
 combined_csv.write(
@@ -150,12 +150,12 @@ for group_key in unique_groups_ckpt:
 
     if cache_flush == 0:
         filename = (
-            f"graphs/cf_disabled/combined_bar_size_{size}_mod_{mod}_ops_{ops}.png"
+            f"graphs/ckpt_compare/cf_disabled/combined_bar_size_{size}_mod_{mod}_ops_{ops}.png"
         )
     else:
-        filename = f"graphs/cf_enabled/combined_bar_size_{size}_mod_{mod}_ops_{ops}.png"
+        filename = f"graphs/ckpt_compare/cf_enabled/combined_bar_size_{size}_mod_{mod}_ops_{ops}.png"
 
     plt.savefig(filename)
     plt.close(fig)
 
-print("Combined graphs generated successfully in 'graphs' directory.")
+print("ckpt cpmparing graphs generated successfully in 'graphs' directory.")

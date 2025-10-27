@@ -6,7 +6,6 @@
 
 #include <stdbool.h>
 #include <stddef.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,6 +14,9 @@
 #include <sys/types.h>
 
 #include <time.h>
+
+#include "ckpt_setup.h"
+
 
 #ifndef ALLOCATOR_AREA_SIZE
 #define ALLOCATOR_AREA_SIZE 0x100000UL
@@ -66,7 +68,7 @@ float __attribute__((optimize("unroll-loops"))) test_checkpoint(int8_t *area, in
     return time_spent;
 }
 
-double restore_area(int8_t *area) {
+double restore_area_test(int8_t *area) {
     int8_t *bitarray = area + 2 * ALLOCATOR_AREA_SIZE;
     int8_t *src = area + ALLOCATOR_AREA_SIZE;
     int8_t *dst = area;
@@ -127,6 +129,13 @@ int main(int argc, char *argv[]) {
     char *endptr;
     int ret;
     int64_t value;
+    void *tls = tls_setup();
+    
+	if (tls == NULL) {
+        fprintf(stderr, "tls_setup failed\n");
+        return EXIT_FAILURE;
+    }
+
 
     srand(42);
     value = rand() % (0xFFFFFFFFFFFFFFFF - 1 + 1) + 1;
@@ -148,7 +157,7 @@ int main(int argc, char *argv[]) {
 #if CF == 1
         clean_cache(area);
 #endif
-        restore_time += restore_area(area);
+        restore_time += restore_area_test(area);
     }
 
     FILE *file = fopen("ckpt_test_results.csv", "a");

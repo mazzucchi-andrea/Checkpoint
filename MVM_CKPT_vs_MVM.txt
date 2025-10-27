@@ -1,7 +1,9 @@
-/include/tls_setup.h
-/src/_tls_setup.c
-Introduzione della funzione void *tls_setup(), un utility che permette di allocare una area di memoria di 64 byte e 
-assegnarla al segmento GS.
+/include/ckpt_setup.h
+/src/_ckpt_setup.c
+Introduzione di:
+	- void *tls_setup();
+La funzione void *tls_setup(), un utility che permette di allocare una area di memoria di 64 byte, 
+o 128 byte nel caso MOD sia 512, e assegnarla al segmento GS.
 
 /patches/patches.c
 Introduzione delle funzioni:
@@ -17,95 +19,94 @@ nel caso 64 bit.
 Per i casi 128 bit e 256 bit vengono aggiunti rispettivamente l'istruzione movdqu %xmm1, %gs:24 o vmovdqu %ymm1, %gs:24.
 
 /src/_asm_patches.S 
-Alla label ckpt_assembly viene introdotto il codice asm che effetua il checkpoint per le tre modalità (64 bit, 128 bit, 256 bit).
+Alla label ckpt_assembly viene introdotto il codice asm che effetua il checkpoint per le quattro modalità (64 bit, 128 bit, 256 bit, 512 bit).
 
 /src/_elf_parse.c 
-Di seguito le modiche linea per linea.
+Di seguito le modifiche o aggiunte linea per linea.
 
-17 #if CKPT
-18 void ckpt_patch(instruction_record *, patch *);
-19 void save_regs_tls(patch *);
-20 #endif
+15 #if CKPT
+16 void ckpt_patch(instruction_record *, patch *);
+17 void save_regs_tls(patch *);
+18 #endif
 
-43 #if CKPT
-44 	if (the_record->type == 'l') { //avoid audit of load instruction in ckpt
-45 		return;
-46 	}
-47 #endif
+40 #if CKPT
+41 	if (the_record->type == 'l') { //avoid audit of load instruction in ckpt
+42 		return;
+43 	}
+44 #endif
 Nel caso CKPT si evita l'audit nel caso delle operazione di load.
 
-131 #if CKPT
-132 	uint64_t ckpt_code = (uint64_t)ckpt_assembly;
-133 #if MOD == 64
-134 	int ckpt_code_size = 0xbe;	//this is taken from the compiled version of the src/_asm_patch.S file
-135 #elif MOD == 128 || MOD == 256
-136 	int ckpt_code_size = 0xd4;	//this is taken from the compiled version of the src/_asm_patch.S file
-137 #endif
-138 #endif
+116 #if CKPT
+117     uint64_t ckpt_code = (uint64_t)ckpt_assembly;
+118 #if MOD == 64
+119     int ckpt_code_size = 0xbe; // this is taken from the compiled version of the src/_asm_patch.S file
+120 #elif MOD == 128
+121     int ckpt_code_size = 0xd9;
+122 #elif MOD == 256
+123     int ckpt_code_size = 0xd4; 
+124 #else
+125     int ckpt_code_size = 0xe3;
+126 #endif
+127 #endif
 Definisce il codice di checkpoint e la sua size nelle varie modalità.
 
-143 		#if CKPT
-144 		if (instructions[i].type == 'l') continue; // avoid patch of load instruction
-145 		#endif
-Evita la patch delle istruzioni di load
+132 #if CKPT
+133        if (instructions[i].type == 'l')
+134             continue; // avoid patch of load instruction
+135 #endif
+Evita la patch delle istruzioni di load.
 
-190 #ifdef CKPT
-191 		#if MOD == 64
-192 		memset((char*)(patches[i].code),0x90, 37 + ckpt_code_size);
-193 		save_regs_tls(&patches[i]);
-194 		patches[i].code = patches[i].code + 27;// 27 is the size of the instructions to save the regs in gs
-195 		#elif MOD == 128 || MOD == 256
-196 		memset((char*)(patches[i].code),0x90, 47 + ckpt_code_size);
-197 		save_regs_tls(&patches[i]);
-198 		patches[i].code = patches[i].code + 37;// 37 is the size of the instructions to save the regs in gs
-199 		#endif
-200
-201 		ckpt_patch(&instructions[i], &patches[i]);
-202 		patches[i].code = patches[i].code + 10;//10 is the mazimum size of the lea instruction
-203 		memcpy((char*)(patches[i].code),(char*)(ckpt_code),ckpt_code_size);
-204 		patches[i].code = patches[i].code + ckpt_code_size;
-205 #endif
+183 #ifdef CKPT
+184 #if MOD == 64
+185         memset((char *)(patches[i].code), 0x90, 37 + ckpt_code_size);
+186         save_regs_tls(&patches[i]);
+187         patches[i].code = patches[i].code + 27; // 27 is the size of the instructions to save the regs in gs
+188 #elif MOD == 128 || MOD == 256
+189         memset((char *)(patches[i].code), 0x90, 47 + ckpt_code_size);
+190         save_regs_tls(&patches[i]);
+191         patches[i].code = patches[i].code + 37; // 37 is the size of the instructions to save the regs in gs
+192 #else
+193         memset((char *)(patches[i].code), 0x90, 49 + ckpt_code_size);
+194         save_regs_tls(&patches[i]);
+195         patches[i].code = patches[i].code + 39;
+196 #endif
+197         ckpt_patch(&instructions[i], &patches[i]);
+198         patches[i].code = patches[i].code + 10; // 10 is the mazimum size of the lea instruction
+199         memcpy((char *)(patches[i].code), (char *)(ckpt_code), ckpt_code_size);
+200         patches[i].code = patches[i].code + ckpt_code_size;
+201 #endif
 Chiamate a save_rgs_tls e ckpt_path prima del salvataggio del codice di checkpointing.
 
-210 #ifdef CKPT
-211		//move again at the begin of the block of instructions forming the patch
-212		//NOTE: you will need to have patches[i].code point again to patches[i].block before proceeding with the following if/else
-213 		#if MOD == 64	
-214 		patches[i].code = patches[i].code - 37 - ckpt_code_size;
-215 		#elif MOD == 128 || MOD == 256
-216 		patches[i].code = patches[i].code - 47 - ckpt_code_size;
-217 		#endif
-218 #endif
+206 #ifdef CKPT
+207         // move again at the begin of the block of instructions forming the patch
+208         // NOTE: you will need to have patches[i].code point again to patches[i].block before proceeding with the
+209         // following if/else
+210 #if MOD == 64
+211         patches[i].code = patches[i].code - 37 - ckpt_code_size;
+212 #elif MOD == 128 || MOD == 256
+213         patches[i].code = patches[i].code - 47 - ckpt_code_size;
+214 #else
+215         patches[i].code = patches[i].code - 49 - ckpt_code_size;
+216 #endif
+217 #endif
 Riallineamento all'inizio del codice della patch
 
-284 #ifdef CKPT 
-285 		//NOTE: for the below code fragment you will need to have patches[i].code point to the copy of the original instruction - you will need to step forward other preceeding instructions forming the patch
-286 		#if MOD == 64
-287 		patches[i].code = patches[i].code + 37 + ckpt_code_size;
-288 		#elif MOD == 128 || MOD == 256
-289 		patches[i].code = patches[i].code + 47 + ckpt_code_size;
-290 		#endif
-291 #endif
+290 #ifdef CKPT
+293 #if MOD == 64
+294         patches[i].code = patches[i].code + 37 + ckpt_code_size;
+295 #elif MOD == 128 || MOD == 256
+296         patches[i].code = patches[i].code + 47 + ckpt_code_size;
+297 #else
+298         patches[i].code = patches[i].code + 49 + ckpt_code_size;
+299 #endif
+300 #endif
 patches[i].code deve puntare all'istruzione originale quindi si proccede a puntare al termine della patch.
 
-343 #if CKPT
-344 		if (instructions[i].type == 'l') continue; // avoid apply patch to load instructions
-345 #endif
+356 #if CKPT
+357         if (instructions[i].type == 'l')
+358             continue; // avoid apply patch to load instructions
+359 #endif
 Nella funzione void apply_patches(void) si evita l'applicazione delle patch alle istruzioni di load.
-
-In int __wrap_main(int argc, char ** argv):
-889 #ifdef CKPT
-890 	void *tls;
-891 #endif
-
-937 #ifdef CKPT
-938 	tls = tls_setup();
-939 	if (tls_setup() == NULL) {
-940         fprintf(stderr, "tls_setup failed\n");
-941         return EXIT_FAILURE;
-942     }
-943 #endif
-Setup del tls prima della passaggio al main reale.
 
 Makefile
 TARGET_FUNCTIONS="<test_checkpoint>"
@@ -150,8 +151,13 @@ patch:
 
 Introduzione del flag MOD per la compilazione di patches.c .
 
-movm: base head startup asm-patch patch tls
+movm: base head startup asm-patch patch ckpt
 	cd ./src; gcc _elf_parse.c -c $(TEMPDIR) $(TEMPFILE) $(DISASSEMBLY_FILE) $(TEMPOBJ) $(TF) $(THE_VM) -I$(INCLUDE) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) -DMOD=$(MOD) -o $(OBJ)/_elf_parse.o
 	cd $(OBJ) ; ld -i *.o -o $(LIB)/movm.o
 
 Introduzione del flag MOD per la compilazione di _elf_parse.c .
+
+ckpt:
+	cd ./src; gcc _ckpt_setup.c -c -I$(INCLUDE) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) -DMOD=$(MOD) -o $(OBJ)/_ckpt_setup.o
+
+Compilazione di ckpt_setup.c
