@@ -63,6 +63,9 @@ checks:
 	@./scripts/file-existence $(APP) $(TARGET_MODULES)
 	@echo "PLEASE for any compiling error run 'make restore-files'\n"
 
+	@if [ ! -d $(OBJ) ]; then mkdir -p $(OBJ); fi
+	@if [ ! -d $(LIB) ]; then mkdir -p $(LIB); fi
+
 base:
 	./scripts/temp-dir.sh $(TEMP) $(TEMP)/$(INTERMEDIATEFILE)
 

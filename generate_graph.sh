@@ -6,3 +6,5 @@ source .venv/bin/activate
 pip install -r requirements.txt
 rm combined_test_results.csv
 python graphs.py
+python mod_graphs.py
+python aligned_graphs.py

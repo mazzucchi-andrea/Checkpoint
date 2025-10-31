@@ -149,13 +149,13 @@ for group_key in unique_groups_ckpt:
     plt.tight_layout()
 
     if cache_flush == 0:
-        filename = (
-            f"graphs/ckpt_compare/cf_disabled/combined_bar_size_{size}_mod_{mod}_ops_{ops}.png"
-        )
+        filename = f"graphs/ckpt_compare/cf_disabled/ckpt_compare_graph_cf_{cache_flush}_size_{size}_mod_{mod}_ops_{ops}.png"
     else:
-        filename = f"graphs/ckpt_compare/cf_enabled/combined_bar_size_{size}_mod_{mod}_ops_{ops}.png"
+        filename = f"graphs/ckpt_compare/cf_enabled/ckpt_compare_graph_cf_{cache_flush}_size_{size}_mod_{mod}_ops_{ops}.png"
 
     plt.savefig(filename)
     plt.close(fig)
 
-print("ckpt cpmparing graphs generated successfully in 'graphs' directory.")
+print(
+    "ckpt comparing graphs generated successfully in 'graphs/ckpt_compare' directory."
+)

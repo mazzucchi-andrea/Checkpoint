@@ -7,8 +7,10 @@ declare -a writes=(0.95 0.90 0.85 0.80 0.75 0.70 0.65 0.60 0.55 0.50 0.45 0.40 0
 # Tests with MVM_CKPT
 rm ckpt_test_results.csv
 echo "size,cache_flush,mod,ops,writes,reads,ckpt_time,restore_time" > ckpt_test_results.csv
+echo "size,cache_flush,mod,ops,writes,reads,ckpt_not_aligned_time,restore_not_aligned_time,ckpt_aligned_time,restore_aligned_time" > ckpt_aligned_comparison_test_results.csv
 
-for mod in 64 128 256 512;
+
+for mod in 64;
 do
     for s in ${size[@]};
     do

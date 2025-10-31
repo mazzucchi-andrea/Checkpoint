@@ -26,7 +26,7 @@ if not os.path.exists("graphs/mods_compare/cf_enabled"):
 
 # Define colors for each group
 colors = {
-    64:  {"ckpt": "#1f77b4", "restore": "#e377c2"},  # Blue -> Pink
+    64: {"ckpt": "#1f77b4", "restore": "#e377c2"},  # Blue -> Pink
     128: {"ckpt": "#ff7f0e", "restore": "#7f7f7f"},  # Orange -> Gray
     256: {"ckpt": "#2ca02c", "restore": "#bcbd22"},  # Green -> Olive
     512: {"ckpt": "#d62728", "restore": "#17becf"},  # Red -> Cyan
@@ -136,9 +136,9 @@ for group_key in unique_groups_ckpt:
     plt.tight_layout()
 
     if cache_flush == 0:
-        filename = f"graphs/mods_compare/cf_disabled/combined_bar_size_{size}_ops_{ops}.png"
+        filename = f"graphs/mods_compare/cf_disabled/mods_compare_graph_cf_{cache_flush}_size_{size}_ops_{ops}.png"
     else:
-        filename = f"graphs/mods_compare/cf_enabled/combined_bar_size_{size}_ops_{ops}.png"
+        filename = f"graphs/mods_compare/cf_enabled/mods_compare_graph_cf_{cache_flush}_size_{size}_ops_{ops}.png"
 
     plt.savefig(filename, dpi=200, bbox_inches="tight")
     plt.close(fig)
