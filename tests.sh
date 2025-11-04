@@ -34,7 +34,6 @@ cd ..
 cd MVM_CKPT
 rm ckpt_test_results.csv
 echo "size,cache_flush,mod,ops,writes,reads,ckpt_time,restore_time" > ckpt_test_results.csv
-echo "size,cache_flush,mod,ops,writes,reads,ckpt_not_aligned_time,restore_not_aligned_time,ckpt_aligned_time,restore_aligned_time" > ckpt_aligned_comparison_test_results.csv
 
 for mod in 64 128 256 512;
 do
@@ -89,6 +88,7 @@ cd ..
 echo "size,cache_flush,mod,ops,writes,reads,ckpt_time,restore_time, time" > combined_test_results.csv
 python -m venv .venv
 source .venv/bin/activate
+pip install --upgrade pip
 pip install -r requirements.txt
 rm combined_test_results.csv
 python graphs.py

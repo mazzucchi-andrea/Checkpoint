@@ -67,26 +67,6 @@ float __attribute__((optimize("unroll-loops"))) test_checkpoint(int8_t *area, in
     return time_spent;
 }
 
-/* Save original values and set the bitarray bit before writing the new value and read */
-float __attribute__((optimize("unroll-loops"))) test_checkpoint_aligned(int8_t *area, int64_t value) {
-    int offset;
-    int64_t read_value;
-    clock_t begin, end;
-    double time_spent;
-    begin = clock();
-    for (int i = 0; i < WRITES; i += 8) {
-        offset = i % (ALLOCATOR_AREA_SIZE - 8 + 1);
-        *(int64_t *)(area + offset) = value;
-    }
-    for (int i = 0; i < READS; i++) {
-        offset = i % (ALLOCATOR_AREA_SIZE - 8 + 1);
-        read_value = *(int64_t *)(area + offset);
-    }
-    end = clock();
-    time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-    return time_spent;
-}
-
 double restore_area_test(int8_t *area) {
     int8_t *bitarray = area + 2 * ALLOCATOR_AREA_SIZE;
     int8_t *src = area + ALLOCATOR_AREA_SIZE;
@@ -148,12 +128,7 @@ int main(int argc, char *argv[]) {
     char *endptr;
     int ret;
     int64_t value;
-#if MOD == 64
-    double wr_time_aligned = 0, restore_time_aligned = 0;
-#endif
-
-    void *tls = tls_setup();
-    if (tls == NULL) {
+    if (tls_setup() == NULL) {
         fprintf(stderr, "tls_setup failed\n");
         return EXIT_FAILURE;
     }
@@ -168,7 +143,6 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
     memset(area, 0, ALLOCATOR_AREA_SIZE * 2 + BITARRAY_SIZE);
-    clean_cache(area);
 
     for (int i = 0; i < 128; i++) {
 #if CF == 1
@@ -190,29 +164,6 @@ int main(int argc, char *argv[]) {
             wr_time / 128, restore_time / 128);
     fprintf(file, "%s", buffer);
     fclose(file);
-
-#if MOD == 64
-    for (int i = 0; i < 128; i++) {
-#if CF == 1
-        clean_cache(area);
-#endif
-        wr_time_aligned += test_checkpoint_aligned(area, value);
-#if CF == 1
-        clean_cache(area);
-#endif
-        restore_time_aligned += restore_area_test(area);
-    }
-
-    file = fopen("ckpt_aligned_comparison_test_results.csv", "a");
-    if (file == NULL) {
-        fprintf(stderr, "Error opening file!\n");
-        return 1;
-    }
-    sprintf(buffer, "0x%lx,%d,%d,%d,%d,%d,%f,%f,%f,%f\n", ALLOCATOR_AREA_SIZE, CF, MOD, WRITES + READS, WRITES, READS,
-            wr_time / 128, restore_time / 128, wr_time_aligned / 128, restore_time_aligned / 128);
-    fprintf(file, "%s", buffer);
-    fclose(file);
-#endif
 
     return EXIT_SUCCESS;
 }

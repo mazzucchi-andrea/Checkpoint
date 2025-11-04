@@ -67,7 +67,6 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
     memset(area, 0, MEM_SIZE);
-    clean_cache(area);
 
     for (int i = 0; i < 128; i++) {
 #if CF == 1

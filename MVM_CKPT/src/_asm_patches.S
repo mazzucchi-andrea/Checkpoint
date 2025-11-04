@@ -96,11 +96,9 @@ end_checkpoint:
         mov %rax,%rcx
         and $0xffffffffffc00000, %rcx
         and $0x3fffff, %rax
-        mov %rax, %rbx
+        test $15,%rax
+        jz second_dqword
         and $0x7ffff0, %rax
-        and $15, %rbx
-        cmp $8, %rbx
-        jb second_dqword
         shr $4, %rax
         mov %rax, %rbx
         and $15, %rbx
@@ -140,6 +138,7 @@ end_checkpoint:
         movdqu %gs:24, %xmm1
 	popf
 	lea 0x1000(%rsp),%rsp
+
 #elif MOD == 256
 	lea -0x1000(%rsp),%rsp //this is for the stack red zone
 	pushf
@@ -147,21 +146,21 @@ end_checkpoint:
         and $0xffffffffffc00000, %rcx
         and $0x3fffff, %rax
         test $31,%rax
-        jz second_qword
+        jz second_256bit
         and $0x7fffe0,%rax
-        shr $4, %rax
+        shr $5, %rax
         mov %rax, %rbx
         and $15, %rbx
-        shr $5, %rax
+        shr $4, %rax
         bts %bx, (2 *ALLOCATOR_AREA_SIZE)(%rcx, %rax, 2)
-        jc next_qword
+        jc next_256bit
         shl $4, %rax
         add %rbx, %rax
         shl $5, %rax
         vmovdqu (%rcx, %rax,), %ymm1
         vmovdqu %ymm1, ALLOCATOR_AREA_SIZE(%rcx, %rax,)
         jmp check_last
-next_qword:
+next_256bit:
         shl $4, %rax
         add %rbx, %rax
         shl $5, %rax
@@ -169,11 +168,11 @@ check_last:
         add $32, %rax
         cmp $ALLOCATOR_AREA_SIZE, %rax
         jge end_checkpoint
-second_qword:
-        shr $4, %rax
+second_256bit:
+        shr $5, %rax
         mov %rax, %rbx
         and $15, %rbx
-        shr $5, %rax
+        shr $4, %rax
         bts %bx, (2 * ALLOCATOR_AREA_SIZE)(%rcx, %rax, 2)
         jc end_checkpoint
         shl $4, %rax
@@ -188,21 +187,20 @@ end_checkpoint:
         vmovdqu %gs:24, %ymm1
 	popf
 	lea 0x1000(%rsp),%rsp
+
 #else
 	lea -0x1000(%rsp),%rsp //this is for the stack red zone
 	pushf
         mov %rax,%rcx
         and $0xffffffffffc00000, %rcx
         and $0x3fffff, %rax
-        mov %rax, %rbx
-        and $0x7fffc0, %rax
-        and $63, %rbx
-        cmp $55, %rbx
+        test $63,%rax
         jz second_512bit
+        and $0x7fffc0, %rax
         shr $6, %rax
         mov %rax, %rbx
         and $15, %rbx
-        shr $5, %rax
+        shr $4, %rax
         bts %bx, (2 *ALLOCATOR_AREA_SIZE)(%rcx, %rax, 2)
         jc next_512bit
         shl $4, %rax

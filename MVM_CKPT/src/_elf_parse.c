@@ -118,11 +118,11 @@ void build_patches(void) {
 #if MOD == 64
     int ckpt_code_size = 0xbe; // this is taken from the compiled version of the src/_asm_patch.S file
 #elif MOD == 128
-    int ckpt_code_size = 0xd9;
+    int ckpt_code_size = 0xd4;
 #elif MOD == 256
-    int ckpt_code_size = 0xd4; 
+    int ckpt_code_size = 0xd4;
 #else
-    int ckpt_code_size = 0xe3;
+    int ckpt_code_size = 0xde;
 #endif
 #endif
 
@@ -428,27 +428,18 @@ int get_data_size(char *instruction, char *source, char *dest, char type) {
         return sizeof(int);
     if (!strcmp(instruction, "movq"))
         return sizeof(unsigned long);
-
     if (!strcmp(instruction, "movss"))
         return sizeof(float);
     if (!strcmp(instruction, "movsd"))
         return sizeof(double);
-    ;
-
     if (!strcmp(instruction, "movzwl"))
         return sizeof(float);
-    ;
     if (!strcmp(instruction, "movzbl"))
         return sizeof(float);
-    ;
     if (!strcmp(instruction, "movzbw"))
         return sizeof(int);
-    ;
-
     if (!strcmp(instruction, "movsbl"))
         return sizeof(int);
-    ;
-
     if (!strcmp(instruction, "mov"))
         return operands_check(source, dest, type);
 
@@ -458,7 +449,6 @@ int get_data_size(char *instruction, char *source, char *dest, char type) {
 // this returns the number of memory move instructions that have been identified for instrumentation - this number is
 // also written to the target_instructions variable
 int elf_parse(char **function_names, char *parsable_elf) {
-
     int i;
     int j;
     int k;
@@ -554,6 +544,9 @@ int elf_parse(char **function_names, char *parsable_elf) {
                             AUDIT
                             printf("move from memory (load)\n");
                             category = 'l';
+#if CKPT
+                            continue;
+#endif
                         } else {
                             AUDIT
                             printf("move to memory (store)\n");
@@ -644,7 +637,7 @@ int elf_parse(char **function_names, char *parsable_elf) {
                         strcpy(instructions[target_instructions].dest, p);
 
                         instructions[target_instructions].data_size = -1;
-                        // determining the size of mouved data
+                        // determining the size of moved data
                         instructions[target_instructions].data_size = get_data_size(
                             instructions[target_instructions].op, instructions[target_instructions].source,
                             instructions[target_instructions].dest, instructions[target_instructions].type);
