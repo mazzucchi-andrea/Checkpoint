@@ -25,18 +25,20 @@
 #endif
 
 float __attribute__((optimize("unroll-loops"))) function(int8_t *area, int64_t value) {
-    int offset;
+    int offset = 0;
     int64_t read_value;
     clock_t begin, end;
     double time_spent;
     begin = clock();
-    for (int i = 0; i < WRITES; i += 4) {
-        offset = i % (MEM_SIZE - 8 + 1);
+    for (int i = 0; i < WRITES; i++) {
+        offset %= (MEM_SIZE - 8 + 1);
         *(int64_t *)(area + offset) = value;
+        offset += 4;
     }
     for (int i = 0; i < READS; i++) {
-        offset = i % (MEM_SIZE - 8 + 1);
+        offset %= (MEM_SIZE - 8 + 1);
         read_value = *(int64_t *)(area + offset);
+        offset += 4;
     }
     end = clock();
     time_spent = (double)(end - begin) / CLOCKS_PER_SEC;

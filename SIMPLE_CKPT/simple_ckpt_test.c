@@ -25,20 +25,21 @@
 #endif
 
 /* Save original values and set the bitarray bit before writing the new value and read */
-float __attribute__((optimize("unroll-loops"))) test_checkpoint(int8_t *area, int8_t *area_copy, int64_t new_value) {
-    int offset;
+float __attribute__((optimize("unroll-loops"))) test_checkpoint(int8_t *area, int8_t *area_copy, int64_t value) {
+    int offset = 0;
     int64_t read_value;
     clock_t begin, end;
     double time_spent;
     begin = clock();
-    memcpy(area_copy, area, SIZE);
-    for (int i = 0; i < WRITES; i += 4) {
-        offset = i % (SIZE - 8 + 1);
-        *(int64_t *)(area + offset) = new_value;
+    for (int i = 0; i < WRITES; i++) {
+        offset %= (SIZE - 8 + 1);
+        *(int64_t *)(area + offset) = value;
+        offset += 4;
     }
     for (int i = 0; i < READS; i++) {
-        offset = i % (SIZE - 8 + 1);
+        offset %= (SIZE - 8 + 1);
         read_value = *(int64_t *)(area + offset);
+        offset += 4;
     }
     end = clock();
     time_spent = (double)(end - begin) / CLOCKS_PER_SEC;

@@ -74,25 +74,25 @@ Disassembly of section .text:
   b8:	48 83 c0 40          	add    $0x40,%rax
 
 00000000000000bc <second_512bit>:
-  bc:	48 c1 e8 06          	shr    $0x6,%rax
-  c0:	48 89 c3             	mov    %rax,%rbx
-  c3:	48 83 e3 0f          	and    $0xf,%rbx
-  c7:	48 c1 e8 04          	shr    $0x4,%rax
-  cb:	66 0f ab 9c 41 00 00 80 00 	bts    %bx,0x800000(%rcx,%rax,2)
-  d4:	72 1d                	jb     f3 <end_checkpoint>
-  d6:	48 c1 e0 04          	shl    $0x4,%rax
-  da:	48 01 d8             	add    %rbx,%rax
-  dd:	48 c1 e0 06          	shl    $0x6,%rax
-  e1:	62 f1 fe 48 6f 0c 01 	vmovdqu64 (%rcx,%rax,1),%zmm1
+  bc:	62 f1 fe 48 6f 0c 01 	vmovdqu64 (%rcx,%rax,1),%zmm1
+  c3:	48 c1 e8 06          	shr    $0x6,%rax
+  c7:	48 89 c3             	mov    %rax,%rbx
+  ca:	48 83 e3 0f          	and    $0xf,%rbx
+  ce:	48 c1 e8 04          	shr    $0x4,%rax
+  d2:	66 0f ab 9c 41 00 00 80 00 	bts    %bx,0x800000(%rcx,%rax,2)
+  db:	72 16                	jb     f3 <end_checkpoint>
+  dd:	48 c1 e0 04          	shl    $0x4,%rax
+  e1:	48 01 d8             	add    %rbx,%rax
+  e4:	48 c1 e0 06          	shl    $0x6,%rax
   e8:	62 f1 fe 48 7f 8c 01 00 00 40 00 	vmovdqu64 %zmm1,0x400000(%rcx,%rax,1)
 
 00000000000000f3 <end_checkpoint>:
-  f3:	65 8a 24 25 58 00 00 00 	mov    %gs:0x58,%ah
+  f3:	65 8a 24 25 18 00 00 00 	mov    %gs:0x18,%ah
   fb:	9e                   	sahf
   fc:	65 48 8b 04 25 00 00 00 00 	mov    %gs:0x0,%rax
  105:	65 48 8b 1c 25 08 00 00 00 	mov    %gs:0x8,%rbx
  10e:	65 48 8b 0c 25 10 00 00 00 	mov    %gs:0x10,%rcx
- 117:	65 62 f1 fe 48 6f 0c 25 18 00 00 00 	vmovdqu64 %gs:0x18,%zmm1
+ 117:	65 62 f1 fe 48 6f 0c 25 1c 00 00 00 	vmovdqu64 %gs:0x1c,%zmm1
 
 Disassembly of section .note.gnu.property:
 

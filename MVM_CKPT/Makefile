@@ -6,8 +6,8 @@ EXECUTABLE = $(APP)/prog
 APP_OBJ = $(APP)/prog.o
 #TARGET_MODULES= a.c  sub-dir/b.c this is an example usage
 TARGET_MODULES= prog.c
-#TARGET_FUNCTIONS="<a>","<b>" this is an example usage
-TARGET_FUNCTIONS="<test_checkpoint>"
+#TARGET_FUNCTIONS="a","b" this is an example usage
+TARGET_FUNCTIONS="test_checkpoint"
 LIBS =
 
 INCLUDE = $(PWD)/include
