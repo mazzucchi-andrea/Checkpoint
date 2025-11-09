@@ -25,7 +25,7 @@
 #endif
 
 /* Save original values and set the bitarray bit before writing the new value and read */
-float __attribute__((optimize("unroll-loops"))) test_checkpoint(int8_t *area, int8_t *area_copy, int64_t value) {
+double test_checkpoint(int8_t *area, int8_t *area_copy, int64_t value) {
     int offset = 0;
     int64_t read_value;
     clock_t begin, end;

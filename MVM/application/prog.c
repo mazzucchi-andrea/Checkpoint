@@ -24,7 +24,7 @@
 #define CF 0
 #endif
 
-float __attribute__((optimize("unroll-loops"))) function(int8_t *area, int64_t value) {
+double function(int8_t *area, int64_t value) {
     int offset = 0;
     int64_t read_value;
     clock_t begin, end;

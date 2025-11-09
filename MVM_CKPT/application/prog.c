@@ -1,6 +1,8 @@
 #include <emmintrin.h> // SSE2
 
+#if MOD > 128
 #include <immintrin.h> // AVX
+#endif
 
 #include <linux/limits.h>
 
@@ -38,17 +40,17 @@
 #endif
 
 #if MOD == 64
-#define BITARRAY_SIZE ALLOCATOR_AREA_SIZE / 8
+#define BITARRAY_SIZE (ALLOCATOR_AREA_SIZE / 8) / 8
 #elif MOD == 128
-#define BITARRAY_SIZE ALLOCATOR_AREA_SIZE / 16
+#define BITARRAY_SIZE (ALLOCATOR_AREA_SIZE / 16) / 8
 #elif MOD == 256
-#define BITARRAY_SIZE ALLOCATOR_AREA_SIZE / 32
+#define BITARRAY_SIZE (ALLOCATOR_AREA_SIZE / 32) / 8
 #else
-#define BITARRAY_SIZE ALLOCATOR_AREA_SIZE / 64
+#define BITARRAY_SIZE (ALLOCATOR_AREA_SIZE / 64) / 8
 #endif
 
 /* Save original values and set the bitarray bit before writing the new value and read */
-float __attribute__((optimize("unroll-loops"))) test_checkpoint(int8_t *area, int64_t value) {
+double test_checkpoint(int8_t *area, int64_t value) {
     int offset = 0;
     int64_t read_value;
     clock_t begin, end;
@@ -79,9 +81,8 @@ double restore_area_test(int8_t *area) {
     double time_spent;
     begin = clock();
 
-    for (int offset = 0; offset < BITARRAY_SIZE; offset += 32) {
-        __m256i bitarray_vec = _mm256_loadu_si256((__m256i *)(bitarray + offset));
-        if (_mm256_testz_si256(bitarray_vec, bitarray_vec)) {
+    for (int offset = 0; offset < BITARRAY_SIZE; offset += 8) {
+        if (*(u_int64_t *)(bitarray + offset) == 0) {
             continue;
         }
         for (int i = 0; i < 32; i += 2) {

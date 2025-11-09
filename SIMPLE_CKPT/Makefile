@@ -4,7 +4,7 @@ READS=50
 CF=0
 
 all:
-	gcc simple_ckpt_test.c -DSIZE=$(SIZE) -DWRITES=$(WRITES) -DREADS=$(READS) -DCF=$(CF)
+	gcc simple_ckpt_test.c -funroll-loops -DSIZE=$(SIZE) -DWRITES=$(WRITES) -DREADS=$(READS) -DCF=$(CF)
 
 clean:
 	rm -f *.out
