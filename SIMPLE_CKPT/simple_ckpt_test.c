@@ -31,15 +31,43 @@ double test_checkpoint(int8_t *area, int8_t *area_copy, int64_t value) {
     clock_t begin, end;
     double time_spent;
     begin = clock();
+    memcpy(area_copy, area, SIZE);
     for (int i = 0; i < WRITES; i++) {
         offset %= (SIZE - 8 + 1);
         *(int64_t *)(area + offset) = value;
         offset += 4;
     }
+    offset = 0;
     for (int i = 0; i < READS; i++) {
         offset %= (SIZE - 8 + 1);
         read_value = *(int64_t *)(area + offset);
         offset += 4;
+    }
+    end = clock();
+    time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+    return time_spent;
+}
+
+double test_checkpoint_repeat(int8_t *area, int8_t *area_copy, int64_t value, int rep) {
+    int offset = 0;
+    int64_t read_value;
+    clock_t begin, end;
+    double time_spent;
+    begin = clock();
+    memcpy(area_copy, area, SIZE);
+    for (int r = 0; r < rep; r++) {
+        offset = 0;
+        for (int i = 0; i < WRITES; i++) {
+            offset %= (SIZE - 8 + 1);
+            *(int64_t *)(area + offset) = value;
+            offset += 4;
+        }
+        offset = 0;
+        for (int i = 0; i < READS; i++) {
+            offset %= (SIZE - 8 + 1);
+            read_value = *(int64_t *)(area + offset);
+            offset += 4;
+        }
     }
     end = clock();
     time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
@@ -65,9 +93,8 @@ void clean_cache(int8_t *area) {
 
 int main(int argc, char *argv[]) {
     double wr_time = 0, restore_time = 0;
-    char buffer[1024];
     char *endptr;
-    int ret;
+    FILE *file;
     int64_t value;
 
     srand(42);
@@ -99,14 +126,36 @@ int main(int argc, char *argv[]) {
         restore_time += restore_area(area, area_copy);
     }
 
-    FILE *file = fopen("simple_ckpt_test_results.csv", "a");
+    file = fopen("simple_ckpt_test_results.csv", "a");
     if (file == NULL) {
         fprintf(stderr, "Error opening file!\n");
         return 1;
     }
-    sprintf(buffer, "0x%lx, %d, %d, %d, %d, %f, %f\n", SIZE, CF, WRITES + READS, WRITES, READS, wr_time / 128,
+    fprintf(file, "0x%lx,%d,%d,%d,%d,%f,%f\n", SIZE, CF, WRITES + READS, WRITES, READS, wr_time / 128,
             restore_time / 128);
-    fprintf(file, "%s", buffer);
+    fclose(file);
+
+    file = fopen("simple_ckpt_repeat_test_results.csv", "a");
+    if (file == NULL) {
+        fprintf(stderr, "Error opening file!\n");
+        return 1;
+    }
+
+    for (int r = 2; r <= 10; r += 2) {
+        for (int i = 0; i < 128; i++) {
+#if CF == 1
+            clean_cache(area);
+#endif
+            wr_time += test_checkpoint_repeat(area, area_copy, value, r);
+#if CF == 1
+            clean_cache(area);
+#endif
+            restore_time += restore_area(area, area_copy);
+        }
+
+        fprintf(file, "0x%lx,%d,%d,%d,%d,%d,%f,%f\n", SIZE, CF, WRITES + READS, WRITES, READS, r, wr_time / 128,
+                restore_time / 128);
+    }
     fclose(file);
 
     return EXIT_SUCCESS;

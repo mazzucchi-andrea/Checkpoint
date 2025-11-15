@@ -35,6 +35,7 @@ double function(int8_t *area, int64_t value) {
         *(int64_t *)(area + offset) = value;
         offset += 4;
     }
+    offset = 0;
     for (int i = 0; i < READS; i++) {
         offset %= (MEM_SIZE - 8 + 1);
         read_value = *(int64_t *)(area + offset);
