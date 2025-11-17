@@ -25,10 +25,10 @@ set yrange [0:*]
 set key outside right top
 
 # Define colors
-set linetype 1 lc rgb "#E41A1C"  # ckpt_time
-set linetype 2 lc rgb "#FC8D62"  # ckpt_restore_time
-set linetype 3 lc rgb "#66C2A5"  # simple_ckpt_time
-set linetype 4 lc rgb "#8DA0CB"  # simple_restore_time
+set linetype 1 lc rgb "#000042"  # ckpt_time
+set linetype 2 lc rgb "#bc272d"  # ckpt_restore_time
+set linetype 3 lc rgb "#e9c716"  # simple_ckpt_time
+set linetype 4 lc rgb "#50ad9f"  # simple_restore_time
 
 set style fill solid border -1
 set grid ytics linestyle 0 linecolor rgb "#E0E0E0"
@@ -44,8 +44,8 @@ set xtics rotate by -45
 set boxwidth step/5
 
 # Create three groups of bars with proper stacking
-plot 'plot_data.csv' using ($5-0.5*step/5):($8+$9) skip 1 with boxes lt 3 title "ckpt restore time", \
-     '' using ($5-0.5*step/5):8 skip 1 with boxes lt 2 title "ckpt time", \
-     '' using ($5+0.5*step/5):($10+$11) skip 1 with boxes lt 5 title "simple restore time", \
-     '' using ($5+0.5*step/5):10 skip 1 with boxes lt 4 title "simple ckpt time"
+plot 'plot_data.csv' using ($5-0.5*step/5):($8+$9) skip 1 with boxes lt 2 title "ckpt restore time", \
+     '' using ($5-0.5*step/5):8 skip 1 with boxes lt 1 title "ckpt time", \
+     '' using ($5+0.5*step/5):($10+$11) skip 1 with boxes lt 4 title "simple restore time", \
+     '' using ($5+0.5*step/5):10 skip 1 with boxes lt 3 title "simple ckpt time"
      

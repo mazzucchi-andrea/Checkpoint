@@ -23,14 +23,14 @@ set yrange [0:*]
 set key outside right top
 
 # Define colors
-set linetype 1 lc rgb "#1f77b4"  # 64_ckpt_time
-set linetype 2 lc rgb "#e377c2"  # 64_ckpt_restore_time
-set linetype 3 lc rgb "#ff7f0e"  # 128_ckpt_time
-set linetype 4 lc rgb "#7f7f7f"  # 128_ckpt_restore_time
-set linetype 5 lc rgb "#2ca02c"  # 256_ckpt_time
-set linetype 6 lc rgb "#bcbd22"  # 256_ckpt_restore_time
-set linetype 7 lc rgb "#d62728"  # 512_ckpt_time
-set linetype 8 lc rgb "#17becf"  # 512_ckpt_restore_time
+set linetype 1 lc rgb "#00347d"  # 64_ckpt_time
+set linetype 2 lc rgb "#008dff"  # 64_ckpt_restore_time
+set linetype 3 lc rgb "#ff73bc"  # 128_ckpt_time
+set linetype 4 lc rgb "#c701ff"  # 128_ckpt_restore_time
+set linetype 5 lc rgb "#4ecb8d"  # 256_ckpt_time
+set linetype 6 lc rgb "#ff9d3a"  # 256_ckpt_restore_time
+set linetype 7 lc rgb "#f9e858"  # 512_ckpt_time
+set linetype 8 lc rgb "#d83034"  # 512_ckpt_restore_time
 
 
 set style fill solid border -1

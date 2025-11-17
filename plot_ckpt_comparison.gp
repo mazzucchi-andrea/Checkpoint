@@ -23,11 +23,11 @@ set yrange [0:*]
 set key outside right top
 
 # Define colors
-set linetype 1 lc rgb "#FFD92F"  # mvm_time
-set linetype 2 lc rgb "#E41A1C"  # ckpt_time
-set linetype 3 lc rgb "#FC8D62"  # ckpt_restore_time
-set linetype 4 lc rgb "#66C2A5"  # simple_ckpt_time
-set linetype 5 lc rgb "#8DA0CB"  # simple_restore_time
+set linetype 1 lc rgb "#800074"  # mvm_time
+set linetype 2 lc rgb "#1a80bb"  # ckpt_time
+set linetype 3 lc rgb "#a00000"  # ckpt_restore_time
+set linetype 4 lc rgb "#298c8c"  # simple_ckpt_time
+set linetype 5 lc rgb "#f1a226"  # simple_restore_time
 
 set style fill solid border -1
 set grid ytics linestyle 0 linecolor rgb "#E0E0E0"
