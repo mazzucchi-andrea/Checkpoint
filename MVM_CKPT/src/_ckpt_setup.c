@@ -2,7 +2,6 @@
 
 #include <immintrin.h> // AVX
 
-#include <stddef.h>
 #include <string.h>
 
 #include <sys/mman.h>
@@ -23,13 +22,15 @@
 #define BITARRAY_SIZE (ALLOCATOR_AREA_SIZE / 16) / 8
 #elif MOD == 256
 #define BITARRAY_SIZE (ALLOCATOR_AREA_SIZE / 32) / 8
-#else
+#elif MOD == 512
 #define BITARRAY_SIZE (ALLOCATOR_AREA_SIZE / 64) / 8
+#else
+#error "Valid MODs are 64, 128, 256, and 512."
 #endif
 
 extern int arch_prctl(int code, unsigned long addr);
 
-void *tls_setup() {
+int tls_setup() {
     unsigned long addr;
     size_t size;
 #if MOD == 512
@@ -38,13 +39,11 @@ void *tls_setup() {
     size = 64;
 #endif
     addr = (unsigned long)mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
-    //addr = (unsigned long)aligned_alloc(16, size);
     memset((void *)addr, 0, size);
-    *(unsigned long *)addr = addr;
     if (arch_prctl(ARCH_SET_GS, addr)) {
-        return NULL;
+        return -1;
     }
-    return (void *)addr;
+    return 0;
 }
 
 void restore_area(int8_t *area) {
@@ -87,3 +86,5 @@ void restore_area(int8_t *area) {
     }
     memset(bitarray, 0, BITARRAY_SIZE);
 }
+
+void set_ckpt(int8_t *area) { memset(area + 2 * ALLOCATOR_AREA_SIZE, 0, BITARRAY_SIZE); }

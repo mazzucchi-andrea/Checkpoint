@@ -23,18 +23,6 @@
 #define ALLOCATOR_AREA_SIZE 0x100000UL
 #endif
 
-#ifndef WRITES
-#define WRITES 950
-#endif
-
-#ifndef READS
-#define READS 50
-#endif
-
-#ifndef CF
-#define CF 0
-#endif
-
 #ifndef MOD
 #define MOD 64
 #endif
@@ -45,8 +33,22 @@
 #define BITARRAY_SIZE (ALLOCATOR_AREA_SIZE / 16) / 8
 #elif MOD == 256
 #define BITARRAY_SIZE (ALLOCATOR_AREA_SIZE / 32) / 8
-#else
+#elif MOD == 512
 #define BITARRAY_SIZE (ALLOCATOR_AREA_SIZE / 64) / 8
+#else
+#error "Valid MODs are 64, 128, 256, and 512."
+#endif
+
+#ifndef WRITES
+#define WRITES 950
+#endif
+
+#ifndef READS
+#define READS 50
+#endif
+
+#ifndef CF
+#define CF 0
 #endif
 
 /* Save original values and set the bitarray bit before writing the new value and read */
@@ -156,7 +158,7 @@ int main(int argc, char *argv[]) {
     char *endptr;
     FILE *file;
     int64_t value;
-    if (tls_setup() == NULL) {
+    if (tls_setup()) {
         fprintf(stderr, "tls_setup failed\n");
         return EXIT_FAILURE;
     }
