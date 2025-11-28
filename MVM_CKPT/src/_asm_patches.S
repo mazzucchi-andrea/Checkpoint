@@ -46,9 +46,9 @@ the_patch_assembly:
 // CKPT ASM CODE
 ckpt_assembly:
         mov %rax, %gs:0x00
-        mov %rbx, %gs:0x08
+        mov %ebx, %gs:0x08
         lahf
-        mov %ax, %gs:0x18
+        mov %ah, %gs:0x0c
 #if MOD == 64
         mov %ecx, %eax
         and $0xffffffffffc00000, %rcx
@@ -86,11 +86,6 @@ second_qword:
         mov (%rcx, %rax, 8), %rbx
         mov %rbx, ALLOCATOR_AREA_SIZE(%rcx, %rax, 8)
 end_checkpoint:
-        mov %gs:0x18, %ah
-        sahf
-        mov %gs:0x00, %rax
-        mov %gs:0x08, %rbx
-        mov %gs:0x10, %rcx
 
 #elif MOD == 128
         movdqa %xmm1, %gs:0x20
@@ -133,11 +128,6 @@ second_dqword:
         shl $4, %eax
         movdqa %xmm1, ALLOCATOR_AREA_SIZE(%rcx, %rax,)
 end_checkpoint:
-        mov %gs:0x18, %ah
-        sahf
-        mov %gs:0x00, %rax
-        mov %gs:0x08, %rbx
-        mov %gs:0x10, %rcx
         movdqa %gs:0x20, %xmm1
 
 #elif MOD == 256
@@ -181,14 +171,9 @@ second_256bit:
         shl $5, %eax
         vmovdqa %ymm1, ALLOCATOR_AREA_SIZE(%rcx, %rax,)
 end_checkpoint:
-        mov %gs:0x18, %ah
-        sahf
-        mov %gs:0x00, %rax
-        mov %gs:0x08, %rbx
-        mov %gs:0x10, %rcx
         vmovdqa %gs:0x20, %ymm1
 
-#else
+#elif MOD == 512
         vmovdqa64 %zmm1,%gs:0x40
 	mov %ecx, %eax
         and $0xffffffffffc00000, %rcx
@@ -229,10 +214,12 @@ second_512bit:
         shl $6, %eax
         vmovdqa64 %zmm1, ALLOCATOR_AREA_SIZE(%rcx, %rax,)
 end_checkpoint:
-        mov %gs:0x18, %ah
+        vmovdqa64 %gs:0x40, %zmm1
+#else
+#error "Valid MODs are 64, 128, 256, and 512."
+#endif
+        mov %gs:0x0c, %ah
         sahf
         mov %gs:0x00, %rax
-        mov %gs:0x08, %rbx
+        mov %gs:0x08, %ebx
         mov %gs:0x10, %rcx
-        vmovdqa64 %gs:0x40, %zmm1
-#endif
