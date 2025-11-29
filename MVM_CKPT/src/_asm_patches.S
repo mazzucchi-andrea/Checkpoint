@@ -49,6 +49,7 @@ ckpt_assembly:
         mov %ebx, %gs:0x08
         lahf
         mov %ah, %gs:0x0c
+        mov %rdx, %gs:0x18
 #if MOD == 64
         mov %ecx, %eax
         and $0xffffffffffc00000, %rcx
@@ -60,12 +61,14 @@ ckpt_assembly:
         mov %eax, %ebx
         and $15, %ebx
         shr $4, %eax
-        bts %bx, (2 *ALLOCATOR_AREA_SIZE)(%rcx, %rax, 2)
+        mov (2 *ALLOCATOR_AREA_SIZE)(%rcx, %rax, 2), %dx
+        bts %bx, %dx
         jc next_qword
+        mov %dx, (2 *ALLOCATOR_AREA_SIZE)(%rcx, %rax, 2)
         shl $4, %eax
         add %ebx, %eax
-        mov (%rcx, %rax, 8), %rbx
-        mov %rbx, ALLOCATOR_AREA_SIZE(%rcx, %rax, 8)
+        mov (%rcx, %rax, 8), %rdx
+        mov %rdx, ALLOCATOR_AREA_SIZE(%rcx, %rax, 8)
         jmp check_last
 next_qword:
         shl $4, %eax
@@ -79,12 +82,14 @@ second_qword:
         mov %eax, %ebx
         and $15, %ebx
         shr $4, %eax
-        bts %bx, (2 * ALLOCATOR_AREA_SIZE)(%rcx, %rax, 2)
+        mov (2 *ALLOCATOR_AREA_SIZE)(%rcx, %rax, 2), %dx
+        bts %bx, %dx
         jc end_checkpoint
+        mov %dx, (2 *ALLOCATOR_AREA_SIZE)(%rcx, %rax, 2)
         shl $4, %eax
         add %ebx, %eax
-        mov (%rcx, %rax, 8), %rbx
-        mov %rbx, ALLOCATOR_AREA_SIZE(%rcx, %rax, 8)
+        mov (%rcx, %rax, 8), %rdx
+        mov %rdx, ALLOCATOR_AREA_SIZE(%rcx, %rax, 8)
 end_checkpoint:
 
 #elif MOD == 128
@@ -100,8 +105,10 @@ end_checkpoint:
         mov %eax, %ebx
         and $15, %ebx
         shr $4, %eax
-        bts %bx, (2 *ALLOCATOR_AREA_SIZE)(%rcx, %rax, 2)
+        mov (2 *ALLOCATOR_AREA_SIZE)(%rcx, %rax, 2), %dx
+        bts %bx, %dx
         jc next_dqword
+        mov %dx, (2 *ALLOCATOR_AREA_SIZE)(%rcx, %rax, 2)
         shl $4, %eax
         add %ebx, %eax
         shl $4, %eax
@@ -121,8 +128,10 @@ second_dqword:
         mov %eax, %ebx
         and $15, %ebx
         shr $4, %eax
-        bts %bx, (2 * ALLOCATOR_AREA_SIZE)(%rcx, %rax, 2)
+        mov (2 *ALLOCATOR_AREA_SIZE)(%rcx, %rax, 2), %dx
+        bts %bx, %dx        
         jc end_checkpoint
+        mov %dx, (2 *ALLOCATOR_AREA_SIZE)(%rcx, %rax, 2)
         shl $4, %eax
         add %ebx, %eax
         shl $4, %eax
@@ -143,8 +152,10 @@ end_checkpoint:
         mov %eax, %ebx
         and $15, %ebx
         shr $4, %eax
-        bts %bx, (2 *ALLOCATOR_AREA_SIZE)(%rcx, %rax, 2)
+        mov (2 *ALLOCATOR_AREA_SIZE)(%rcx, %rax, 2), %dx
+        bts %bx, %dx 
         jc next_256bit
+        mov %dx, (2 *ALLOCATOR_AREA_SIZE)(%rcx, %rax, 2)
         shl $4, %eax
         add %ebx, %eax
         shl $5, %eax
@@ -164,8 +175,10 @@ second_256bit:
         mov %eax, %ebx
         and $15, %ebx
         shr $4, %eax
-        bts %bx, (2 * ALLOCATOR_AREA_SIZE)(%rcx, %rax, 2)
+        mov (2 *ALLOCATOR_AREA_SIZE)(%rcx, %rax, 2), %dx
+        bts %bx, %dx
         jc end_checkpoint
+        mov %dx, (2 *ALLOCATOR_AREA_SIZE)(%rcx, %rax, 2)
         shl $4, %eax
         add %ebx, %eax
         shl $5, %eax
@@ -185,8 +198,10 @@ end_checkpoint:
         mov %eax, %ebx
         and $15, %ebx
         shr $4, %eax
-        bts %bx, (2 *ALLOCATOR_AREA_SIZE)(%rcx, %rax, 2)
+        mov (2 *ALLOCATOR_AREA_SIZE)(%rcx, %rax, 2), %dx
+        bts %bx, %dx
         jc next_512bit
+        mov %dx, (2 *ALLOCATOR_AREA_SIZE)(%rcx, %rax, 2)
         shl $4, %eax
         add %ebx, %eax
         shl $6, %eax
@@ -207,8 +222,10 @@ second_512bit:
         mov %eax, %ebx
         and $15, %ebx
         shr $4, %eax
-        bts %bx, (2 * ALLOCATOR_AREA_SIZE)(%rcx, %rax, 2)
+        mov (2 *ALLOCATOR_AREA_SIZE)(%rcx, %rax, 2), %dx
+        bts %bx, %dx
         jc end_checkpoint
+        mov %dx, (2 *ALLOCATOR_AREA_SIZE)(%rcx, %rax, 2)
         shl $4, %eax
         add %ebx, %eax
         shl $6, %eax
@@ -223,3 +240,4 @@ end_checkpoint:
         mov %gs:0x00, %rax
         mov %gs:0x08, %ebx
         mov %gs:0x10, %rcx
+        mov %gs:0x18, %rdx
