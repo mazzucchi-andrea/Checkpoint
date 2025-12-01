@@ -1,7 +1,8 @@
-MEM_SIZE=0x100000UL
+ALLOCATOR_AREA_SIZE=0x200000UL
 WRITES=950
 READS=50
+MOD=64
 CF=0
 
 all:
-	gcc -c prog.c -funroll-loops -pie -fPIE  -I ../include -DMEM_SIZE=$(MEM_SIZE) -DWRITES=$(WRITES) -DREADS=$(READS) -DCF=$(CF)
+	gcc -c prog.c -mavx -mavx2 -mavx512f -funroll-loops -pie -fPIE -I ../include -DALLOCATOR_AREA_SIZE=$(ALLOCATOR_AREA_SIZE) -DWRITES=$(WRITES) -DREADS=$(READS) -DCF=$(CF) -DMOD=$(MOD)

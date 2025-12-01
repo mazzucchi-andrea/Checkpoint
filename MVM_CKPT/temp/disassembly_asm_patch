@@ -48,56 +48,56 @@ Disassembly of section .text:
   5b:	65 89 1c 25 08 00 00 00 	mov    %ebx,%gs:0x8
   63:	9f                   	lahf
   64:	65 88 24 25 0c 00 00 00 	mov    %ah,%gs:0xc
-  6c:	65 62 f1 fd 48 7f 0c 25 40 00 00 00 	vmovdqa64 %zmm1,%gs:0x40
-  78:	89 c8                	mov    %ecx,%eax
-  7a:	48 81 e1 00 00 c0 ff 	and    $0xffffffffffc00000,%rcx
-  81:	48 25 ff ff 3f 00    	and    $0x3fffff,%rax
-  87:	a8 3f                	test   $0x3f,%al
-  89:	74 49                	je     d4 <second_512bit>
-  8b:	25 c0 ff 7f 00       	and    $0x7fffc0,%eax
-  90:	c1 e8 06             	shr    $0x6,%eax
-  93:	89 c3                	mov    %eax,%ebx
-  95:	83 e3 0f             	and    $0xf,%ebx
-  98:	c1 e8 04             	shr    $0x4,%eax
-  9b:	66 0f ab 9c 41 00 00 80 00 	bts    %bx,0x800000(%rcx,%rax,2)
-  a4:	72 1c                	jb     c2 <next_512bit>
-  a6:	c1 e0 04             	shl    $0x4,%eax
-  a9:	01 d8                	add    %ebx,%eax
-  ab:	c1 e0 06             	shl    $0x6,%eax
-  ae:	62 f1 fd 48 6f 0c 01 	vmovdqa64 (%rcx,%rax,1),%zmm1
-  b5:	62 f1 fd 48 7f 8c 01 00 00 40 00 	vmovdqa64 %zmm1,0x400000(%rcx,%rax,1)
-  c0:	eb 08                	jmp    ca <check_last>
+  6c:	65 c5 fd 7f 0c 25 20 00 00 00 	vmovdqa %ymm1,%gs:0x20
+  76:	89 c8                	mov    %ecx,%eax
+  78:	48 81 e1 00 00 c0 ff 	and    $0xffffffffffc00000,%rcx
+  7f:	48 25 ff ff 3f 00    	and    $0x3fffff,%rax
+  85:	a8 1f                	test   $0x1f,%al
+  87:	74 45                	je     ce <second_256bit>
+  89:	25 e0 ff 7f 00       	and    $0x7fffe0,%eax
+  8e:	c5 fd 6f 0c 01       	vmovdqa (%rcx,%rax,1),%ymm1
+  93:	c1 e8 05             	shr    $0x5,%eax
+  96:	89 c3                	mov    %eax,%ebx
+  98:	83 e3 0f             	and    $0xf,%ebx
+  9b:	c1 e8 04             	shr    $0x4,%eax
+  9e:	66 0f ab 9c 41 00 00 40 00 	bts    %bx,0x400000(%rcx,%rax,2)
+  a7:	72 13                	jb     bc <next_256bit>
+  a9:	c1 e0 04             	shl    $0x4,%eax
+  ac:	01 d8                	add    %ebx,%eax
+  ae:	c1 e0 05             	shl    $0x5,%eax
+  b1:	c5 fd 7f 8c 01 00 00 20 00 	vmovdqa %ymm1,0x200000(%rcx,%rax,1)
+  ba:	eb 08                	jmp    c4 <check_last>
 
-00000000000000c2 <next_512bit>:
-  c2:	c1 e0 04             	shl    $0x4,%eax
-  c5:	01 d8                	add    %ebx,%eax
-  c7:	c1 e0 06             	shl    $0x6,%eax
+00000000000000bc <next_256bit>:
+  bc:	c1 e0 04             	shl    $0x4,%eax
+  bf:	01 d8                	add    %ebx,%eax
+  c1:	c1 e0 05             	shl    $0x5,%eax
 
-00000000000000ca <check_last>:
-  ca:	3d c0 ff 3f 00       	cmp    $0x3fffc0,%eax
-  cf:	74 33                	je     104 <end_checkpoint>
-  d1:	83 c0 40             	add    $0x40,%eax
+00000000000000c4 <check_last>:
+  c4:	3d e0 ff 1f 00       	cmp    $0x1fffe0,%eax
+  c9:	74 2f                	je     fa <end_checkpoint>
+  cb:	83 c0 20             	add    $0x20,%eax
 
-00000000000000d4 <second_512bit>:
-  d4:	62 f1 fd 48 6f 0c 01 	vmovdqa64 (%rcx,%rax,1),%zmm1
-  db:	c1 e8 06             	shr    $0x6,%eax
-  de:	89 c3                	mov    %eax,%ebx
-  e0:	83 e3 0f             	and    $0xf,%ebx
-  e3:	c1 e8 04             	shr    $0x4,%eax
-  e6:	66 0f ab 9c 41 00 00 80 00 	bts    %bx,0x800000(%rcx,%rax,2)
-  ef:	72 13                	jb     104 <end_checkpoint>
-  f1:	c1 e0 04             	shl    $0x4,%eax
-  f4:	01 d8                	add    %ebx,%eax
-  f6:	c1 e0 06             	shl    $0x6,%eax
-  f9:	62 f1 fd 48 7f 8c 01 00 00 40 00 	vmovdqa64 %zmm1,0x400000(%rcx,%rax,1)
+00000000000000ce <second_256bit>:
+  ce:	c5 fd 6f 0c 01       	vmovdqa (%rcx,%rax,1),%ymm1
+  d3:	c1 e8 05             	shr    $0x5,%eax
+  d6:	89 c3                	mov    %eax,%ebx
+  d8:	83 e3 0f             	and    $0xf,%ebx
+  db:	c1 e8 04             	shr    $0x4,%eax
+  de:	66 0f ab 9c 41 00 00 40 00 	bts    %bx,0x400000(%rcx,%rax,2)
+  e7:	72 11                	jb     fa <end_checkpoint>
+  e9:	c1 e0 04             	shl    $0x4,%eax
+  ec:	01 d8                	add    %ebx,%eax
+  ee:	c1 e0 05             	shl    $0x5,%eax
+  f1:	c5 fd 7f 8c 01 00 00 20 00 	vmovdqa %ymm1,0x200000(%rcx,%rax,1)
 
-0000000000000104 <end_checkpoint>:
- 104:	65 62 f1 fd 48 6f 0c 25 40 00 00 00 	vmovdqa64 %gs:0x40,%zmm1
- 110:	65 8a 24 25 0c 00 00 00 	mov    %gs:0xc,%ah
- 118:	9e                   	sahf
- 119:	65 48 8b 04 25 00 00 00 00 	mov    %gs:0x0,%rax
- 122:	65 8b 1c 25 08 00 00 00 	mov    %gs:0x8,%ebx
- 12a:	65 48 8b 0c 25 10 00 00 00 	mov    %gs:0x10,%rcx
+00000000000000fa <end_checkpoint>:
+  fa:	65 c5 fd 6f 0c 25 20 00 00 00 	vmovdqa %gs:0x20,%ymm1
+ 104:	65 8a 24 25 0c 00 00 00 	mov    %gs:0xc,%ah
+ 10c:	9e                   	sahf
+ 10d:	65 48 8b 04 25 00 00 00 00 	mov    %gs:0x0,%rax
+ 116:	65 8b 1c 25 08 00 00 00 	mov    %gs:0x8,%ebx
+ 11e:	65 48 8b 0c 25 10 00 00 00 	mov    %gs:0x10,%rcx
 
 Disassembly of section .note.gnu.property:
 
@@ -111,14 +111,14 @@ Disassembly of section .note.gnu.property:
    f:	00 02                	add    %al,(%rdx)
   11:	00 01                	add    %al,(%rcx)
   13:	c0 04 00 00          	rolb   $0x0,(%rax,%rax,1)
-  17:	00 0b                	add    %cl,(%rbx)
+  17:	00 07                	add    %al,(%rdi)
   19:	00 00                	add    %al,(%rax)
   1b:	00 00                	add    %al,(%rax)
   1d:	00 00                	add    %al,(%rax)
   1f:	00 01                	add    %al,(%rcx)
   21:	00 01                	add    %al,(%rcx)
   23:	c0 04 00 00          	rolb   $0x0,(%rax,%rax,1)
-  27:	00 39                	add    %bh,(%rcx)
+  27:	00 19                	add    %bl,(%rcx)
   29:	00 00                	add    %al,(%rax)
   2b:	00 00                	add    %al,(%rax)
   2d:	00 00                	add    %al,(%rax)

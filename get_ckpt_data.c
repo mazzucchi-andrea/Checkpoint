@@ -7,10 +7,12 @@
 typedef struct {
     char size[32];
     char cache_flush[32];
+    char mod[32];
     char ops[32];
     char writes[32];
     char reads[32];
-    char mvm_time[32];
+    char mvm_ckpt_time[32];
+    char mvm_restore_time[32];
 } MVMRow;
 
 typedef struct {
@@ -81,8 +83,8 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    fprintf(output_file, "size,cache_flush,mod,ops,writes,reads,ckpt_time,ckpt_restore_time,mvm_time,simple_ckpt_time,"
-                         "simple_restore_time\n");
+    fprintf(output_file, "size,cache_flush,mod,ops,writes,reads,ckpt_time,ckpt_restore_time,mvm_ckpt_time,mvm_restore_"
+                         "time,simple_ckpt_time,simple_restore_time\n");
 
     MVMRow mvm_row;
     SimpleCkptRow simple_ckpt_row;
@@ -96,18 +98,15 @@ int main(int argc, char *argv[]) {
             strtol(ckpt_row.mod, &endptr, 10) != mod || strtol(ckpt_row.ops, &endptr, 10) != ops) {
             continue;
         }
-        fprintf(output_file, "%s,%s,%s,%s,%s,%s,%s,%s", ckpt_row.size, ckpt_row.cache_flush, ckpt_row.mod, ckpt_row.ops,
-                ckpt_row.writes, ckpt_row.reads, ckpt_row.ckpt_time, ckpt_row.ckpt_restore_time);
 
         fseek(mvm_file, 0, SEEK_SET);
         fgets(line, sizeof(line), mvm_file);
         while (fgets(line, sizeof(line), mvm_file)) {
-            sscanf(line, "%[^,],%[^,],%[^,],%[^,],%[^,],%s", mvm_row.size, mvm_row.cache_flush, mvm_row.ops,
-                   mvm_row.writes, mvm_row.reads, mvm_row.mvm_time);
+            sscanf(line, "%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%s", mvm_row.size, mvm_row.cache_flush, mvm_row.mod,
+                   mvm_row.ops, mvm_row.writes, mvm_row.reads, mvm_row.mvm_ckpt_time, mvm_row.mvm_restore_time);
             if (strcmp(ckpt_row.size, mvm_row.size) == 0 && strcmp(ckpt_row.cache_flush, mvm_row.cache_flush) == 0 &&
                 strcmp(ckpt_row.ops, mvm_row.ops) == 0 && strcmp(ckpt_row.writes, mvm_row.writes) == 0 &&
                 strcmp(ckpt_row.reads, mvm_row.reads) == 0) {
-                fprintf(output_file, ",%s", mvm_row.mvm_time);
                 break;
             }
         }
@@ -123,10 +122,13 @@ int main(int argc, char *argv[]) {
                 strcmp(ckpt_row.ops, simple_ckpt_row.ops) == 0 &&
                 strcmp(ckpt_row.writes, simple_ckpt_row.writes) == 0 &&
                 strcmp(ckpt_row.reads, simple_ckpt_row.reads) == 0) {
-                fprintf(output_file, ",%s,%s\n", simple_ckpt_row.simple_ckpt_time, simple_ckpt_row.simple_restore_time);
                 break;
             }
         }
+        fprintf(output_file, "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n", ckpt_row.size, ckpt_row.cache_flush, ckpt_row.mod,
+                ckpt_row.ops, ckpt_row.writes, ckpt_row.reads, ckpt_row.ckpt_time, ckpt_row.ckpt_restore_time,
+                mvm_row.mvm_ckpt_time, mvm_row.mvm_restore_time, simple_ckpt_row.simple_ckpt_time,
+                simple_ckpt_row.simple_restore_time);
     }
 
     fclose(mvm_file);
