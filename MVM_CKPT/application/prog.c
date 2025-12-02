@@ -158,10 +158,8 @@ int main(int argc, char *argv[]) {
     char *endptr;
     FILE *file;
     int64_t value;
-    if (tls_setup()) {
-        fprintf(stderr, "tls_setup failed\n");
-        return EXIT_FAILURE;
-    }
+    
+    _tls_setup();
 
     srand(42);
     value = rand() % (0xFFFFFFFFFFFFFFFF - 1 + 1) + 1;

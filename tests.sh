@@ -4,6 +4,7 @@ declare -a cache_flush=(0 1)
 declare -a ops=(1000 10000 100000 1000000)
 declare -a size=(0x100000UL 0x200000UL 0x400000UL)
 declare -a writes=(0.95 0.90 0.85 0.80 0.75 0.70 0.65 0.60 0.55 0.50 0.45 0.40 0.35 0.30)
+declare -a mods=(64 128 256 512)
 
 # Tests with MVM_CKPT
 cd MVM_CKPT
@@ -12,7 +13,7 @@ rm ckpt_repeat_test_results.csv
 echo "size,cache_flush,mod,ops,writes,reads,ckpt_time,restore_time" > ckpt_test_results.csv
 echo "size,cache_flush,mod,ops,writes,reads,repetitions,ckpt_time,restore_time" > ckpt_repeat_test_results.csv
 
-for mod in 64 128 256 512;
+for mod in ${mods[@]};
 do
     for s in ${size[@]};
     do
