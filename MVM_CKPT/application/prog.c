@@ -19,26 +19,6 @@
 
 #include "ckpt_setup.h"
 
-#ifndef ALLOCATOR_AREA_SIZE
-#define ALLOCATOR_AREA_SIZE 0x100000UL
-#endif
-
-#ifndef MOD
-#define MOD 64
-#endif
-
-#if MOD == 64
-#define BITARRAY_SIZE (ALLOCATOR_AREA_SIZE / 8) / 8
-#elif MOD == 128
-#define BITARRAY_SIZE (ALLOCATOR_AREA_SIZE / 16) / 8
-#elif MOD == 256
-#define BITARRAY_SIZE (ALLOCATOR_AREA_SIZE / 32) / 8
-#elif MOD == 512
-#define BITARRAY_SIZE (ALLOCATOR_AREA_SIZE / 64) / 8
-#else
-#error "Valid MODs are 64, 128, 256, and 512."
-#endif
-
 #ifndef WRITES
 #define WRITES 950
 #endif
@@ -158,7 +138,7 @@ int main(int argc, char *argv[]) {
     char *endptr;
     FILE *file;
     int64_t value;
-    
+
     _tls_setup();
 
     srand(42);

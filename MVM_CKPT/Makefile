@@ -7,7 +7,7 @@ APP_OBJ = $(APP)/prog.o
 #TARGET_MODULES= a.c  sub-dir/b.c this is an example usage
 TARGET_MODULES= prog.c
 #TARGET_FUNCTIONS="a","b" this is an example usage
-TARGET_FUNCTIONS="test_checkpoint"
+TARGET_FUNCTIONS="test_checkpoint_not_aligned","test_checkpoint_aligned"
 LIBS =
 
 INCLUDE = $(PWD)/include
@@ -34,7 +34,7 @@ UDTEMPOBJ = -Duser_defined_temp_obj_file=\"$(USER_DEFINED)/$(USER_DEFINED_OBJ_FI
 
 SECURITY_FLAGS = -pie -fPIE -fstack-protector-all
 
-ADDITIONAL_FLAGS = -O3 -DCKPT -DAPPLY_PATCHES #-DVERBOSE
+ADDITIONAL_FLAGS = -O3 -DCKPT -DAPPLY_PATCHES -DVERBOSE
 
 #NOTE: 
 #the ASM_PREAMBLE macro enables building a demo patch for each memory access instruction
@@ -45,18 +45,14 @@ ADDITIONAL_FLAGS = -O3 -DCKPT -DAPPLY_PATCHES #-DVERBOSE
 
 #CKPT FLAGS
 ALLOCATOR_AREA_SIZE=0x100000UL
-WRITES=950
-READS=50
 MOD=64
-CF=0
-
 
 THE_VM = -DVM_NAME=\"MVM\"
 
 all: checks backup-files file-rewriting compile-and-link restore-files
 
 compile-and-link: movm
-	export C_INCLUDE_PATH=$(PWD)/include; cd $(APP) ; make ALLOCATOR_AREA_SIZE=$(ALLOCATOR_AREA_SIZE) MOD=$(MOD) WRITES=$(WRITES) READS=$(READS) CF=$(CF) ; gcc $(APP_OBJ) $(LIB)/movm.o -o $(EXECUTABLE) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) $(LIBS) -Xlinker --wrap=main
+	export C_INCLUDE_PATH=$(PWD)/include; cd $(APP) ; make ALLOCATOR_AREA_SIZE=$(ALLOCATOR_AREA_SIZE) MOD=$(MOD) ; gcc $(APP_OBJ) $(LIB)/movm.o -o $(EXECUTABLE) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) $(LIBS) -Xlinker --wrap=main
 	objdump -Dw $(EXECUTABLE) > $(DISASSEMBLY) 
 
 checks:
@@ -66,6 +62,8 @@ checks:
 
 	@if [ ! -d $(OBJ) ]; then mkdir -p $(OBJ); fi
 	@if [ ! -d $(LIB) ]; then mkdir -p $(LIB); fi
+	@if [ ! -d $(TEMP) ]; then mkdir -p $(TEMP); fi
+	@if [ ! -d $(TEMP)/$(SHADOW) ]; then mkdir -p $(TEMP)/$(SHADOW); fi
 
 base:
 	./scripts/temp-dir.sh $(TEMP) $(TEMP)/$(INTERMEDIATEFILE)
@@ -84,7 +82,7 @@ asm-patch:
 	objdump -Dw $(OBJ)/_asm_patches.o > $(TEMP)/disassembly_asm_patch                   
 
 patch:
-	cd ./patches; gcc patches.c -c -I$(INCLUDE) $(THE_VM) $(UDTEMPDIR) $(UDTEMPFILE) $(UDTEMPOBJ) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) -DMOD=$(MOD) -o $(OBJ)/_patches.o
+	cd ./patches; gcc patches.c -c -I$(INCLUDE) $(THE_VM) $(UDTEMPDIR) $(UDTEMPFILE) $(UDTEMPOBJ) $(SECURITY_FLAGS) $(ADDITIONAL_FLAGS) -o $(OBJ)/_patches.o
 #please rember to insert whatever Makefile in the user-defined directory
 	cd $(USER_DEFINED); make
 
@@ -103,4 +101,4 @@ file-rewriting:
 	export MVM_TEMP_FILE=$(TEMP)/__temp_file ; ./scripts/file-processor.sh $(APP) $(TARGET_MODULES)
 
 clean:
-	find . -name "*.o" -type f -delete ; rm -f $(EXECUTABLE)
+	find . -name "*.o" -type f -delete ; rm -f $(EXECUTABLE) ; find $(TEMP) -type f -exec rm {} +
