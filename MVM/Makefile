@@ -1,3 +1,4 @@
+
 #APPLICATION SPECIFIC STUFF
 #the below specify the directory where the user application is located, the name of the executable to be generated, the name of the object file of the program and the names of the target functions to instrument 
 #IMPORTANT: a Makefile in the APP dir is responsible for generating the .o file specified by APP_OBJ
@@ -6,9 +7,10 @@ EXECUTABLE = $(APP)/prog
 APP_OBJ = $(APP)/prog.o
 #TARGET_MODULES= a.c  sub-dir/b.c this is an example usage
 TARGET_MODULES= prog.c
-#TARGET_FUNCTIONS="<a>","<b>" this is an example usage
-TARGET_FUNCTIONS="<function>"
-LIBS =
+#TARGET_FUNCTIONS="<a>:","<b>:" this is an example usage
+TARGET_FUNCTIONS="<function>:"
+LIBS = -lpthread
+
 
 INCLUDE = $(PWD)/include
 OBJ = $(PWD)/obj
