@@ -45,7 +45,7 @@ ADDITIONAL_FLAGS = -O3 -DASM_PREAMBLE -DAPPLY_PATCHES #-DVERBOSE
 #the VERBOSE macro simply leads to the massive production of output messages 
 
 #TEST FLAGS
-MEM_SIZE=0x100000UL
+MEM_SIZE=0x100000
 WRITES=950
 READS=50
 CF=0
@@ -98,4 +98,5 @@ file-rewriting:
 	export MVM_TEMP_FILE=$(TEMP)/__temp_file ; ./scripts/file-processor.sh $(APP) $(TARGET_MODULES)
 
 clean:
-	find . -name "*.o" -type f -delete ; rm -f $(EXECUTABLE)
+	find . -name "*.o" -type f -delete ; rm -f $(EXECUTABLE) ; find $(TEMP) -type f -exec rm {} +
+

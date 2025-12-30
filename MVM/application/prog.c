@@ -1,6 +1,9 @@
 #include <emmintrin.h> // SSE2
-
+#include <errno.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -9,7 +12,7 @@
 #include <time.h>
 
 #ifndef MEM_SIZE
-#define MEM_SIZE 0x100000UL
+#define MEM_SIZE 0x100000
 #endif
 
 #ifndef WRITES
@@ -24,20 +27,20 @@
 #define CF 0
 #endif
 
-double function(int8_t *area, int64_t value) {
+double function(u_int8_t *area, int64_t value) {
     int offset = 0;
     int64_t read_value;
     clock_t begin, end;
     double time_spent;
     begin = clock();
     for (int i = 0; i < WRITES; i++) {
-        offset %= (MEM_SIZE - 8 + 1);
+        offset %= (MEM_SIZE - 8);
         *(int64_t *)(area + offset) = value;
         offset += 4;
     }
     offset = 0;
     for (int i = 0; i < READS; i++) {
-        offset %= (MEM_SIZE - 8 + 1);
+        offset %= (MEM_SIZE - 8);
         read_value = *(int64_t *)(area + offset);
         offset += 4;
     }
@@ -46,7 +49,7 @@ double function(int8_t *area, int64_t value) {
     return time_spent;
 }
 
-void clean_cache(int8_t *area) {
+void clean_cache(u_int8_t *area) {
     int cache_line_size = __builtin_cpu_supports("sse2") ? 64 : 32;
     for (int i = 0; i < (2 * MEM_SIZE + MEM_SIZE); i += (cache_line_size / 8)) {
         _mm_clflush(area + i);
@@ -54,22 +57,20 @@ void clean_cache(int8_t *area) {
 }
 
 int main(int argc, char **argv) {
-    double time = 0;
-    char buffer[1024];
-    char *endptr;
-    int ret;
+    double time = 0.0;
     int64_t value;
 
     srand(42);
-    value = rand() % (0xFFFFFFFFFFFFFFFF - 1 + 1) + 1;
+    value = rand() % INT64_MAX;
 
-    size_t alignment = 8 * (1024 * MEM_SIZE);
-    int8_t *area = (int8_t *)aligned_alloc(alignment, MEM_SIZE * 2);
-    if (area == NULL) {
-        perror("aligned_alloc failed\n");
-        return EXIT_FAILURE;
+    unsigned long base_addr = 8UL * 1024UL * MEM_SIZE;
+    size_t size = 2 * MEM_SIZE;
+    u_int8_t *area = mmap((void *)base_addr, size, PROT_READ | PROT_WRITE,
+                          MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, 0, 0);
+    if (area == MAP_FAILED) {
+        perror("mmap failed");
+        return errno;
     }
-    memset(area, 0, MEM_SIZE);
 
     for (int i = 0; i < 128; i++) {
 #if CF == 1
@@ -81,10 +82,10 @@ int main(int argc, char **argv) {
     FILE *file = fopen("mvm_test_results.csv", "a");
     if (file == NULL) {
         fprintf(stderr, "Error opening file!\n");
-        return 1;
+        return EXIT_FAILURE;
     }
-    sprintf(buffer, "0x%lx,%d,%d,%d,%d,%f\n", MEM_SIZE, CF, WRITES + READS, WRITES, READS, time / 128);
-    fprintf(file, "%s", buffer);
+    fprintf(file, "0x%x,%d,%d,%d,%d,%f\n", MEM_SIZE, CF, WRITES + READS, WRITES,
+            READS, time / 128);
     fclose(file);
 
     return EXIT_SUCCESS;

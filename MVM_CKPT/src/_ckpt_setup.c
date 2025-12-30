@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include <sys/mman.h>
+#include <sys/types.h>
 
 #include "ckpt_setup.h"
 
@@ -31,7 +32,7 @@ void _restore_area(u_int8_t *area) {
     u_int16_t current_word;
     int target_offset;
 
-    for (int offset = 0; offset < BITARRAY_SIZE; offset += 8) {
+    for (int offset = 0; offset < BITMAP_SIZE; offset += 8) {
         if (*(u_int64_t *)(bitarray + offset) == 0) {
             continue;
         }
@@ -62,7 +63,10 @@ void _restore_area(u_int8_t *area) {
             }
         }
     }
-    memset(bitarray, 0, BITARRAY_SIZE);
+    memset(bitarray, 0, BITMAP_SIZE);
 }
 
-void _set_ckpt(u_int8_t *area) { memset(area + 2 * ALLOCATOR_AREA_SIZE, 0, BITARRAY_SIZE); }
+void _set_ckpt(void *area) {
+    memcpy((void *)(area + ALLOCATOR_AREA_SIZE), area, ALLOCATOR_AREA_SIZE);
+    memset((void *)(area + 2 * ALLOCATOR_AREA_SIZE), 0, BITMAP_SIZE);
+}

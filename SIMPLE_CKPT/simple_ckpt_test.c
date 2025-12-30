@@ -1,11 +1,9 @@
 #include <emmintrin.h> // SSE2
-
+#include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-
 #include <sys/mman.h>
-
 #include <time.h>
 
 #ifndef SIZE
@@ -24,8 +22,9 @@
 #define CF 0
 #endif
 
-/* Save original values and set the bitarray bit before writing the new value and read */
-double test_checkpoint(int8_t *area, int8_t *area_copy, int64_t value) {
+/* Save original values and set the bitarray bit before writing the new value
+ * and read */
+double test_checkpoint(u_int8_t *area, u_int8_t *area_copy, int64_t value) {
     int offset = 0;
     int64_t read_value;
     clock_t begin, end;
@@ -48,7 +47,8 @@ double test_checkpoint(int8_t *area, int8_t *area_copy, int64_t value) {
     return time_spent;
 }
 
-double test_checkpoint_repeat(int8_t *area, int8_t *area_copy, int64_t value, int rep) {
+double test_checkpoint_repeat(u_int8_t *area, u_int8_t *area_copy,
+                              int64_t value, int rep) {
     int offset = 0;
     int64_t read_value;
     clock_t begin, end;
@@ -74,7 +74,7 @@ double test_checkpoint_repeat(int8_t *area, int8_t *area_copy, int64_t value, in
     return time_spent;
 }
 
-double restore_area(int8_t *area, int8_t *area_copy) {
+double restore_area(u_int8_t *area, u_int8_t *area_copy) {
     clock_t begin, end;
     double time_spent;
     begin = clock();
@@ -84,7 +84,7 @@ double restore_area(int8_t *area, int8_t *area_copy) {
     return time_spent;
 }
 
-void clean_cache(int8_t *area) {
+void clean_cache(u_int8_t *area) {
     int cache_line_size = __builtin_cpu_supports("sse2") ? 64 : 32;
     for (int i = 0; i < SIZE; i += (cache_line_size / 8)) {
         _mm_clflush(area + i);
@@ -98,22 +98,17 @@ int main(int argc, char *argv[]) {
     int64_t value;
 
     srand(42);
-    value = rand() % (0xFFFFFFFFFFFFFFFF - 1 + 1) + 1;
+    value = rand() % INT64_MAX;
 
-    size_t alignment = 8 * (1024 * SIZE);
-    int8_t *area = (int8_t *)aligned_alloc(alignment, SIZE);
-    if (area == NULL) {
-        perror("aligned_alloc failed\n");
-        return EXIT_FAILURE;
+    unsigned long base_addr = 8UL * 1024UL * SIZE;
+    size_t size = 2 * SIZE;
+    u_int8_t *area = mmap((void *)base_addr, size, PROT_READ | PROT_WRITE,
+                          MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, 0, 0);
+    if (area == MAP_FAILED) {
+        perror("mmap failed");
+        return errno;
     }
-    int8_t *area_copy = (int8_t *)mmap(NULL, SIZE, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
-    if (area == NULL) {
-        perror("aligned_alloc failed\n");
-        return EXIT_FAILURE;
-    }
-    memset(area, 0, SIZE);
-    memset(area_copy, 0, SIZE);
-    clean_cache(area);
+    u_int8_t *area_copy = (u_int8_t *)(area + SIZE);
 
     for (int i = 0; i < 128; i++) {
 #if CF == 1
@@ -131,8 +126,8 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Error opening file!\n");
         return 1;
     }
-    fprintf(file, "0x%lx,%d,%d,%d,%d,%f,%f\n", SIZE, CF, WRITES + READS, WRITES, READS, wr_time / 128,
-            restore_time / 128);
+    fprintf(file, "0x%lx,%d,%d,%d,%d,%f,%f\n", SIZE, CF, WRITES + READS, WRITES,
+            READS, wr_time / 128, restore_time / 128);
     fclose(file);
 
     file = fopen("simple_ckpt_repeat_test_results.csv", "a");
@@ -153,8 +148,8 @@ int main(int argc, char *argv[]) {
             restore_time += restore_area(area, area_copy);
         }
 
-        fprintf(file, "0x%lx,%d,%d,%d,%d,%d,%f,%f\n", SIZE, CF, WRITES + READS, WRITES, READS, r, wr_time / 128,
-                restore_time / 128);
+        fprintf(file, "0x%lx,%d,%d,%d,%d,%d,%f,%f\n", SIZE, CF, WRITES + READS,
+                WRITES, READS, r, wr_time / 128, restore_time / 128);
     }
     fclose(file);
 
