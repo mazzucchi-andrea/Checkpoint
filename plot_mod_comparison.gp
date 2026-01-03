@@ -23,14 +23,14 @@ set yrange [0:*]
 set key outside right top
 
 # Define colors
-set linetype 1 lc rgb "#00347d"  # 64_ckpt_time
-set linetype 2 lc rgb "#008dff"  # 64_ckpt_restore_time
-set linetype 3 lc rgb "#ff73bc"  # 128_ckpt_time
-set linetype 4 lc rgb "#c701ff"  # 128_ckpt_restore_time
-set linetype 5 lc rgb "#4ecb8d"  # 256_ckpt_time
-set linetype 6 lc rgb "#ff9d3a"  # 256_ckpt_restore_time
-set linetype 7 lc rgb "#f9e858"  # 512_ckpt_time
-set linetype 8 lc rgb "#d83034"  # 512_ckpt_restore_time
+set linetype 1 lc rgb "#00347d"  # 8_ckpt_time
+set linetype 2 lc rgb "#008dff"  # 8_ckpt_restore_time
+set linetype 3 lc rgb "#ff73bc"  # 16_ckpt_time
+set linetype 4 lc rgb "#c701ff"  # 16_ckpt_restore_time
+set linetype 5 lc rgb "#4ecb8d"  # 32_ckpt_time
+set linetype 6 lc rgb "#ff9d3a"  # 32_ckpt_restore_time
+set linetype 7 lc rgb "#f9e858"  # 64_ckpt_time
+set linetype 8 lc rgb "#d83034"  # 64_ckpt_restore_time
 
 
 set style fill solid border -1
@@ -47,11 +47,11 @@ set xtics rotate by -45
 set boxwidth step/5
 
 # Create three groups of bars with proper stacking
-plot 'plot_data.csv' using ($4-1.5*(step/5)):($6+$7) skip 1 with boxes lt 2 title "64 ckpt restore time", \
-     '' using ($4-1.5*(step/5)):($6) skip 1 with boxes lt 1 title "64 ckpt time", \
-     '' using ($4-0.5*(step/5)):($8+$9) skip 1 with boxes lt 4 title "128 ckpt restore time", \
-     '' using ($4-0.5*(step/5)):($8) skip 1 with boxes lt 3 title "128 ckpt time", \
-     '' using ($4+0.5*(step/5)):($10+$11) skip 1 with boxes lt 6 title "256 ckpt restore time", \
-     '' using ($4+0.5*(step/5)):($10) skip 1 with boxes lt 5 title "256 ckpt time", \
-     '' using ($4+1.5*(step/5)):($12+$13) skip 1 with boxes lt 8 title "512 ckpt restore time", \
-     '' using ($4+1.5*(step/5)):($12) skip 1 with boxes lt 7 title "512 ckpt time"
+plot 'plot_data.csv' using ($4-1.5*(step/5)):($6+$7) skip 1 with boxes lt 2 title "8 ckpt restore time", \
+     '' using ($4-1.5*(step/5)):($6) skip 1 with boxes lt 1 title "8 ckpt time", \
+     '' using ($4-0.5*(step/5)):($8+$9) skip 1 with boxes lt 4 title "16 ckpt restore time", \
+     '' using ($4-0.5*(step/5)):($8) skip 1 with boxes lt 3 title "16 ckpt time", \
+     '' using ($4+0.5*(step/5)):($10+$11) skip 1 with boxes lt 6 title "32 ckpt restore time", \
+     '' using ($4+0.5*(step/5)):($10) skip 1 with boxes lt 5 title "32 ckpt time", \
+     '' using ($4+1.5*(step/5)):($12+$13) skip 1 with boxes lt 8 title "64 ckpt restore time", \
+     '' using ($4+1.5*(step/5)):($12) skip 1 with boxes lt 7 title "64 ckpt time"

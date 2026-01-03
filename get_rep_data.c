@@ -51,8 +51,8 @@ int main(int argc, char *argv[]) {
     }
 
     mod = strtol(argv[3], &endptr, 10);
-    if (*endptr != '\0' || (mod != 64 && mod != 128 && mod != 256 && mod != 512)) {
-        fprintf(stderr, "mod must be 64, 128, 256, 512 instead of %d\n", mod);
+    if (*endptr != '\0' || (mod != 8 && mod != 16 && mod != 32 && mod != 64)) {
+        fprintf(stderr, "mod must be 8, 16, 32, 64 instead of %d\n", mod);
         return EXIT_FAILURE;
     }
 
