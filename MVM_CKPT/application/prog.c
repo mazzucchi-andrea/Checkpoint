@@ -1,9 +1,6 @@
 #include <emmintrin.h> // SSE2
 #include <errno.h>
 #include <immintrin.h> // AVX
-#include <linux/limits.h>
-#include <stdbool.h>
-#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,7 +15,6 @@ double test_checkpoint(u_int8_t *area, int64_t value) {
     int offset = 0;
     __attribute__((unused)) int64_t read_value;
     clock_t begin, end;
-    double time_spent;
 
     begin = clock();
     _set_ckpt(area);
@@ -27,6 +23,7 @@ double test_checkpoint(u_int8_t *area, int64_t value) {
         *(int64_t *)(area + offset) = value;
         offset += 4;
     }
+    offset = 0;
     for (int i = 0; i < READS; i++) {
         offset %= (ALLOCATOR_AREA_SIZE - 8);
         read_value = *(int64_t *)(area + offset);
@@ -34,17 +31,16 @@ double test_checkpoint(u_int8_t *area, int64_t value) {
     }
     end = clock();
 
-    time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-    return time_spent;
+    return (double)(end - begin) / CLOCKS_PER_SEC;
 }
 
 double test_checkpoint_repeat(u_int8_t *area, int64_t value, int rep) {
     int offset = 0;
     __attribute__((unused)) int64_t read_value;
     clock_t begin, end;
-    double time_spent;
 
     begin = clock();
+    _set_ckpt(area);
     for (int r = 0; r < rep; r++) {
         offset = 0;
         for (int i = 0; i < WRITES; i++) {
@@ -61,8 +57,7 @@ double test_checkpoint_repeat(u_int8_t *area, int64_t value, int rep) {
     }
     end = clock();
 
-    time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-    return time_spent;
+    return (double)(end - begin) / CLOCKS_PER_SEC;
 }
 
 double restore_area_test(u_int8_t *area) {
@@ -72,9 +67,8 @@ double restore_area_test(u_int8_t *area) {
     u_int16_t current_word;
     int target_offset;
     clock_t begin, end;
-    double time_spent;
-    begin = clock();
 
+    begin = clock();
     for (int offset = 0; offset < BITMAP_SIZE; offset += 8) {
         if (*(u_int64_t *)(bitmap + offset) == 0) {
             continue;
@@ -86,20 +80,25 @@ double restore_area_test(u_int8_t *area) {
             }
             for (int k = 0; k < 16; k++) {
                 if (((current_word >> k) & 1) == 1) {
+                    target_offset = ((offset + i) * 8 + k) * MOD;
 #if MOD == 8
-                    target_offset = ((offset + i) * 8 + k) * 8;
-                    *(u_int64_t *)(dst + target_offset) = *(u_int64_t *)(src + target_offset);
+                    *(u_int64_t *)(dst + target_offset) =
+                        *(u_int64_t *)(src + target_offset);
 #elif MOD == 16
-                    target_offset = ((offset + i) * 8 + k) * 16;
-                    *(__int128 *)(dst + target_offset) = *(__int128 *)(src + target_offset);
+                    *(__int128 *)(dst + target_offset) =
+                        *(__int128 *)(src + target_offset);
 #elif MOD == 32
-                    target_offset = ((offset + i) * 8 + k) * 32;
-                    __m256i ckpt_value = _mm256_loadu_si256((__m256i *)(src + target_offset));
-                    _mm256_storeu_si256((__m256i *)(dst + target_offset), ckpt_value);
+                    __m256i ckpt_value =
+                        _mm256_loadu_si256((__m256i *)(src + target_offset));
+                    _mm256_storeu_si256((__m256i *)(dst + target_offset),
+                                        ckpt_value);
+#elif MOD == 64
+                    __m512i ckpt_value =
+                        _mm512_load_si512((void *)(src + target_offset));
+                    _mm512_storeu_si512((void *)(dst + target_offset),
+                                        ckpt_value);
 #else
-                    target_offset = ((offset + i) * 8 + k) * 64;
-                    __m512i ckpt_value = _mm512_load_si512((void *)(src + target_offset));
-                    _mm512_storeu_si512((void *)(dst + target_offset), ckpt_value);
+                    memcpy(dst + target_offset, src + target_offset, MOD);
 #endif
                 }
             }
@@ -109,8 +108,7 @@ double restore_area_test(u_int8_t *area) {
     memset(bitmap, 0, BITMAP_SIZE);
 
     end = clock();
-    time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-    return time_spent;
+    return (double)(end - begin) / CLOCKS_PER_SEC;
 }
 
 void clean_cache(u_int8_t *area) {
@@ -133,8 +131,9 @@ int main(void) {
     srand(42);
     value = rand() % INT64_MAX;
 
-    u_int8_t *area = mmap((void *)base_addr, size, PROT_READ | PROT_WRITE,
-                          MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0);
+    u_int8_t *area =
+        (u_int8_t *)mmap((void *)base_addr, size, PROT_READ | PROT_WRITE,
+                         MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0);
     if (area == MAP_FAILED) {
         perror("mmap failed");
         return errno;
@@ -167,6 +166,8 @@ int main(void) {
     }
 
     for (int r = 2; r <= 10; r += 2) {
+        wr_time = 0.0;
+        restore_time = 0.0;
         for (int i = 0; i < 128; i++) {
 #if CF == 1
             clean_cache(area);

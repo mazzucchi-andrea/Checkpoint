@@ -28,7 +28,7 @@ double test_checkpoint(u_int8_t *area, u_int8_t *area_copy, int64_t value) {
     int offset = 0;
     int64_t read_value;
     clock_t begin, end;
-    double time_spent;
+
     begin = clock();
     memcpy(area_copy, area, SIZE);
     for (int i = 0; i < WRITES; i++) {
@@ -43,8 +43,8 @@ double test_checkpoint(u_int8_t *area, u_int8_t *area_copy, int64_t value) {
         offset += 4;
     }
     end = clock();
-    time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-    return time_spent;
+
+    return (double)(end - begin) / CLOCKS_PER_SEC;
 }
 
 double test_checkpoint_repeat(u_int8_t *area, u_int8_t *area_copy,
@@ -52,7 +52,7 @@ double test_checkpoint_repeat(u_int8_t *area, u_int8_t *area_copy,
     int offset = 0;
     int64_t read_value;
     clock_t begin, end;
-    double time_spent;
+
     begin = clock();
     memcpy(area_copy, area, SIZE);
     for (int r = 0; r < rep; r++) {
@@ -70,18 +70,18 @@ double test_checkpoint_repeat(u_int8_t *area, u_int8_t *area_copy,
         }
     }
     end = clock();
-    time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-    return time_spent;
+
+    return (double)(end - begin) / CLOCKS_PER_SEC;
 }
 
 double restore_area(u_int8_t *area, u_int8_t *area_copy) {
     clock_t begin, end;
-    double time_spent;
+
     begin = clock();
     memcpy(area, area_copy, SIZE);
     end = clock();
-    time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-    return time_spent;
+
+    return (double)(end - begin) / CLOCKS_PER_SEC;
 }
 
 void clean_cache(u_int8_t *area) {
@@ -92,7 +92,7 @@ void clean_cache(u_int8_t *area) {
 }
 
 int main(int argc, char *argv[]) {
-    double wr_time = 0, restore_time = 0;
+    double wr_time = 0.0, restore_time = 0.0;
     char *endptr;
     FILE *file;
     int64_t value;
@@ -102,8 +102,9 @@ int main(int argc, char *argv[]) {
 
     unsigned long base_addr = 8UL * 1024UL * SIZE;
     size_t size = 2 * SIZE;
-    u_int8_t *area = mmap((void *)base_addr, size, PROT_READ | PROT_WRITE,
-                          MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, 0, 0);
+    u_int8_t *area =
+        (u_int8_t *)mmap((void *)base_addr, size, PROT_READ | PROT_WRITE,
+                         MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, 0, 0);
     if (area == MAP_FAILED) {
         perror("mmap failed");
         return errno;
@@ -137,6 +138,8 @@ int main(int argc, char *argv[]) {
     }
 
     for (int r = 2; r <= 10; r += 2) {
+        wr_time = 0.0;
+        restore_time = 0.0;
         for (int i = 0; i < 128; i++) {
 #if CF == 1
             clean_cache(area);

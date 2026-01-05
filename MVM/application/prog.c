@@ -1,14 +1,10 @@
 #include <emmintrin.h> // SSE2
 #include <errno.h>
-#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <sys/mman.h>
-#include <sys/stat.h>
 #include <sys/types.h>
-
 #include <time.h>
 
 #ifndef MEM_SIZE
@@ -31,7 +27,7 @@ double function(u_int8_t *area, int64_t value) {
     int offset = 0;
     int64_t read_value;
     clock_t begin, end;
-    double time_spent;
+
     begin = clock();
     for (int i = 0; i < WRITES; i++) {
         offset %= (MEM_SIZE - 8);
@@ -45,8 +41,8 @@ double function(u_int8_t *area, int64_t value) {
         offset += 4;
     }
     end = clock();
-    time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-    return time_spent;
+
+    return (double)(end - begin) / CLOCKS_PER_SEC;
 }
 
 void clean_cache(u_int8_t *area) {
@@ -65,7 +61,7 @@ int main(int argc, char **argv) {
 
     unsigned long base_addr = 8UL * 1024UL * MEM_SIZE;
     size_t size = 2 * MEM_SIZE;
-    u_int8_t *area = mmap((void *)base_addr, size, PROT_READ | PROT_WRITE,
+    u_int8_t *area = (u_int8_t *)mmap((void *)base_addr, size, PROT_READ | PROT_WRITE,
                           MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, 0, 0);
     if (area == MAP_FAILED) {
         perror("mmap failed");

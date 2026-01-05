@@ -54,8 +54,10 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    fprintf(output_file, "size,cache_flush,ops,writes,reads,8_ckpt_time,8_ckpt_restore_time,16_ckpt_time,16_ckpt_"
-                         "restore_time,32_ckpt_time,32_ckpt_restore_time,64_ckpt_time,64_ckpt_restore_time\n");
+    fprintf(output_file, "size,cache_flush,ops,writes,reads,8_ckpt_time,8_ckpt_"
+                         "restore_time,16_ckpt_time,16_ckpt_"
+                         "restore_time,32_ckpt_time,32_ckpt_restore_time,64_"
+                         "ckpt_time,64_ckpt_restore_time\n");
 
     CkptRow ckpt_rows_8[14];
     CkptRow ckpt_rows_16[14];
@@ -66,9 +68,12 @@ int main(int argc, char *argv[]) {
     int i = 0, j = 0, k = 0, l = 0;
     fgets(line, sizeof(line), ckpt_file);
     while (fgets(line, sizeof(line), ckpt_file)) {
-        sscanf(line, "%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%s", ckpt_row.size, ckpt_row.cache_flush, ckpt_row.mod,
-               ckpt_row.ops, ckpt_row.writes, ckpt_row.reads, ckpt_row.ckpt_time, ckpt_row.ckpt_restore_time);
-        if (strtol(ckpt_row.size, &endptr, 16) != size || strtol(ckpt_row.cache_flush, &endptr, 10) != cache_flush ||
+        sscanf(line, "%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%s",
+               ckpt_row.size, ckpt_row.cache_flush, ckpt_row.mod, ckpt_row.ops,
+               ckpt_row.writes, ckpt_row.reads, ckpt_row.ckpt_time,
+               ckpt_row.ckpt_restore_time);
+        if (strtol(ckpt_row.size, &endptr, 16) != size ||
+            strtol(ckpt_row.cache_flush, &endptr, 10) != cache_flush ||
             strtol(ckpt_row.ops, &endptr, 10) != ops) {
             continue;
         }
@@ -91,10 +96,12 @@ int main(int argc, char *argv[]) {
     }
 
     for (i = 0; i < 14; i++) {
-        fprintf(output_file, "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n", ckpt_rows_8[i].size,
-                ckpt_rows_8[i].cache_flush, ckpt_rows_8[i].ops, ckpt_rows_8[i].writes, ckpt_rows_8[i].reads,
-                ckpt_rows_8[i].ckpt_time, ckpt_rows_8[i].ckpt_restore_time, ckpt_rows_16[i].ckpt_time,
-                ckpt_rows_16[i].ckpt_restore_time, ckpt_rows_32[i].ckpt_time, ckpt_rows_32[i].ckpt_restore_time,
+        fprintf(output_file, "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n",
+                ckpt_rows_8[i].size, ckpt_rows_8[i].cache_flush,
+                ckpt_rows_8[i].ops, ckpt_rows_8[i].writes, ckpt_rows_8[i].reads,
+                ckpt_rows_8[i].ckpt_time, ckpt_rows_8[i].ckpt_restore_time,
+                ckpt_rows_16[i].ckpt_time, ckpt_rows_16[i].ckpt_restore_time,
+                ckpt_rows_32[i].ckpt_time, ckpt_rows_32[i].ckpt_restore_time,
                 ckpt_rows_64[i].ckpt_time, ckpt_rows_64[i].ckpt_restore_time);
     }
     fclose(output_file);

@@ -41,7 +41,8 @@ int main(int argc, char *argv[]) {
     int size, cache_flush, mod, ops;
 
     if (argc < 5) {
-        fprintf(stderr, "Usage: %s <size> <cache_flush> <mod> <ops>\n", argv[0]);
+        fprintf(stderr, "Usage: %s <size> <cache_flush> <mod> <ops>\n",
+                argv[0]);
         return EXIT_FAILURE;
     }
 
@@ -69,7 +70,8 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    printf("Generate plot data for 0x%x, %d, %d, %d\n", size, cache_flush, mod, ops);
+    printf("Generate plot data for 0x%x, %d, %d, %d\n", size, cache_flush, mod,
+           ops);
 
     mvm_file = fopen("MVM/mvm_test_results.csv", "r");
     simple_ckpt_file = fopen("SIMPLE_CKPT/simple_ckpt_test_results.csv", "r");
@@ -81,7 +83,8 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    fprintf(output_file, "size,cache_flush,mod,ops,writes,reads,ckpt_time,ckpt_restore_time,mvm_time,simple_ckpt_time,"
+    fprintf(output_file, "size,cache_flush,mod,ops,writes,reads,ckpt_time,ckpt_"
+                         "restore_time,mvm_time,simple_ckpt_time,"
                          "simple_restore_time\n");
 
     MVMRow mvm_row;
@@ -90,22 +93,31 @@ int main(int argc, char *argv[]) {
 
     fgets(line, sizeof(line), ckpt_file);
     while (fgets(line, sizeof(line), ckpt_file)) {
-        sscanf(line, "%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%s", ckpt_row.size, ckpt_row.cache_flush, ckpt_row.mod,
-               ckpt_row.ops, ckpt_row.writes, ckpt_row.reads, ckpt_row.ckpt_time, ckpt_row.ckpt_restore_time);
-        if (strtol(ckpt_row.size, &endptr, 16) != size || strtol(ckpt_row.cache_flush, &endptr, 10) != cache_flush ||
-            strtol(ckpt_row.mod, &endptr, 10) != mod || strtol(ckpt_row.ops, &endptr, 10) != ops) {
+        sscanf(line, "%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%s",
+               ckpt_row.size, ckpt_row.cache_flush, ckpt_row.mod, ckpt_row.ops,
+               ckpt_row.writes, ckpt_row.reads, ckpt_row.ckpt_time,
+               ckpt_row.ckpt_restore_time);
+        if (strtol(ckpt_row.size, &endptr, 16) != size ||
+            strtol(ckpt_row.cache_flush, &endptr, 10) != cache_flush ||
+            strtol(ckpt_row.mod, &endptr, 10) != mod ||
+            strtol(ckpt_row.ops, &endptr, 10) != ops) {
             continue;
         }
-        fprintf(output_file, "%s,%s,%s,%s,%s,%s,%s,%s", ckpt_row.size, ckpt_row.cache_flush, ckpt_row.mod, ckpt_row.ops,
-                ckpt_row.writes, ckpt_row.reads, ckpt_row.ckpt_time, ckpt_row.ckpt_restore_time);
+        fprintf(output_file, "%s,%s,%s,%s,%s,%s,%s,%s", ckpt_row.size,
+                ckpt_row.cache_flush, ckpt_row.mod, ckpt_row.ops,
+                ckpt_row.writes, ckpt_row.reads, ckpt_row.ckpt_time,
+                ckpt_row.ckpt_restore_time);
 
         fseek(mvm_file, 0, SEEK_SET);
         fgets(line, sizeof(line), mvm_file);
         while (fgets(line, sizeof(line), mvm_file)) {
-            sscanf(line, "%[^,],%[^,],%[^,],%[^,],%[^,],%s", mvm_row.size, mvm_row.cache_flush, mvm_row.ops,
-                   mvm_row.writes, mvm_row.reads, mvm_row.mvm_time);
-            if (strcmp(ckpt_row.size, mvm_row.size) == 0 && strcmp(ckpt_row.cache_flush, mvm_row.cache_flush) == 0 &&
-                strcmp(ckpt_row.ops, mvm_row.ops) == 0 && strcmp(ckpt_row.writes, mvm_row.writes) == 0 &&
+            sscanf(line, "%[^,],%[^,],%[^,],%[^,],%[^,],%s", mvm_row.size,
+                   mvm_row.cache_flush, mvm_row.ops, mvm_row.writes,
+                   mvm_row.reads, mvm_row.mvm_time);
+            if (strcmp(ckpt_row.size, mvm_row.size) == 0 &&
+                strcmp(ckpt_row.cache_flush, mvm_row.cache_flush) == 0 &&
+                strcmp(ckpt_row.ops, mvm_row.ops) == 0 &&
+                strcmp(ckpt_row.writes, mvm_row.writes) == 0 &&
                 strcmp(ckpt_row.reads, mvm_row.reads) == 0) {
                 fprintf(output_file, ",%s", mvm_row.mvm_time);
                 break;
@@ -115,15 +127,20 @@ int main(int argc, char *argv[]) {
         fseek(simple_ckpt_file, 0, SEEK_SET);
         fgets(line, sizeof(line), simple_ckpt_file);
         while (fgets(line, sizeof(line), simple_ckpt_file)) {
-            sscanf(line, "%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%s", simple_ckpt_row.size, simple_ckpt_row.cache_flush,
-                   simple_ckpt_row.ops, simple_ckpt_row.writes, simple_ckpt_row.reads, simple_ckpt_row.simple_ckpt_time,
+            sscanf(line, "%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%s",
+                   simple_ckpt_row.size, simple_ckpt_row.cache_flush,
+                   simple_ckpt_row.ops, simple_ckpt_row.writes,
+                   simple_ckpt_row.reads, simple_ckpt_row.simple_ckpt_time,
                    simple_ckpt_row.simple_restore_time);
             if (strcmp(ckpt_row.size, simple_ckpt_row.size) == 0 &&
-                strcmp(ckpt_row.cache_flush, simple_ckpt_row.cache_flush) == 0 &&
+                strcmp(ckpt_row.cache_flush, simple_ckpt_row.cache_flush) ==
+                    0 &&
                 strcmp(ckpt_row.ops, simple_ckpt_row.ops) == 0 &&
                 strcmp(ckpt_row.writes, simple_ckpt_row.writes) == 0 &&
                 strcmp(ckpt_row.reads, simple_ckpt_row.reads) == 0) {
-                fprintf(output_file, ",%s,%s\n", simple_ckpt_row.simple_ckpt_time, simple_ckpt_row.simple_restore_time);
+                fprintf(output_file, ",%s,%s\n",
+                        simple_ckpt_row.simple_ckpt_time,
+                        simple_ckpt_row.simple_restore_time);
                 break;
             }
         }
