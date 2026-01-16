@@ -27,11 +27,11 @@ typedef struct _instruction_record {
     uint64_t address;
     unsigned long size;
     char indirect_jump;     //'y' or 'n' - this must be 'y' for any instruction
-                            //whose size is less than 5 bytes
+                            // whose size is less than 5 bytes
     uint64_t middle_buffer; // this is usefull only for intructions requiring
                             // indirect jumps - 0x0 should be the default
-    char type;                          // load 'l' or store 's'
-    char rip_relative;                  //'y' or 'n'
+    char type;              // load 'l' or store 's'
+    char rip_relative;      //'y' or 'n'
     uint64_t effective_operand_address; // should be 0x0 for non RIP-relative
                                         // instructions
     // whole string of the instruction

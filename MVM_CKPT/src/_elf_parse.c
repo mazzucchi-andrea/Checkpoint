@@ -1,11 +1,8 @@
-#include <fcntl.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #include <unistd.h>
 
 #include "elf_parse.h"
@@ -13,7 +10,7 @@
 
 void user_defined(instruction_record *, patch *);
 #if CKPT
-void ckpt_patch(instruction_record *, patch *);
+int ckpt_patch(instruction_record *, patch *);
 #endif
 
 uint64_t asl_randomization = 0;
@@ -70,7 +67,6 @@ int fd;
 // user-defined instrumentation function
 void build_intermediate_representation(void) {
     int i;
-    int ret;
 
     patches = (patch *)
         address1; // always use this reference for accessing the patch area
@@ -106,15 +102,13 @@ uint64_t book_intermediate_target(uint64_t instruction_address,
 }
 
 void build_patches(void) {
-    int i;
     unsigned long size;
-    uint64_t instruction_address;
-    int jmp_displacement;
     char *jmp_target;
     char v[128]; // this hosts the jmp binary
-    int jmp_back_displacement;
+    int i, pos;
+    int jmp_displacement, jmp_back_displacement;
+    uint64_t instruction_address;
     uint64_t patch_address;
-    int pos;
     uint64_t effective_operand_address;
     uint64_t effective_operand_displacement;
     uint64_t intermediate_target;
@@ -126,6 +120,7 @@ void build_patches(void) {
 #if CKPT
     uint64_t ckpt_code = (uint64_t)ckpt_assembly;
     size_t ckpt_code_size = (uintptr_t)dummy_ckpt - (uintptr_t)ckpt_assembly;
+    size_t save_reg_lea;
 #endif
 
     patches = (patch *)address1;
@@ -197,13 +192,11 @@ void build_patches(void) {
 #endif
 
 #ifdef CKPT
-        memset((char *)(patches[i].code), 0x90, 46 + ckpt_code_size);
-        ckpt_patch(&instructions[i], &patches[i]);
+        save_reg_lea = ckpt_patch(&instructions[i], &patches[i]);
         patches[i].code =
-            patches[i].code +
-            46; // 36 is the size of the structions need to save regs in GS and
-                // 10 is the maximum size of the lea instruction and 9 is the
-                // instruction to save rcx
+            patches[i].code + save_reg_lea; // the size of the instructions
+                                            // needed to save regs in GS and
+                                            // the size of the lea instruction
         memcpy((char *)(patches[i].code), (char *)(ckpt_code), ckpt_code_size);
         patches[i].code = patches[i].code + ckpt_code_size;
 #endif
@@ -216,7 +209,7 @@ void build_patches(void) {
         // move again at the begin of the block of instructions forming the
         // patch NOTE: you will need to have patches[i].code point again to
         // patches[i].block before proceeding with the following if/else
-        patches[i].code = patches[i].code - 46 - ckpt_code_size;
+        patches[i].code = patches[i].code - save_reg_lea - ckpt_code_size;
 #endif
 
 #ifdef ASM_PREAMBLE
@@ -310,7 +303,7 @@ void build_patches(void) {
         // patches[i].code point to the copy of the original instruction - you
         // will need to step forward other preceeding instructions forming the
         // patch
-        patches[i].code = patches[i].code + 46 + ckpt_code_size;
+        patches[i].code = patches[i].code + save_reg_lea + ckpt_code_size;
 #endif
 
 #ifdef ASM_PREAMBLE
@@ -377,7 +370,6 @@ void apply_patches(void) {
     unsigned long size;
     unsigned long instruction_address;
     unsigned long instruction_patch;
-    unsigned short instruction_short_patch;
 
     for (i = 0; i < target_instructions; i++) {
 #if CKPT
@@ -513,8 +505,6 @@ int elf_parse(char **function_names, char *parsable_elf) {
     int j;
     int k;
     int num_functions;
-    int offset;
-    int len;
     FILE *the_file;
     char *guard;
     char *p;
@@ -554,8 +544,8 @@ int elf_parse(char **function_names, char *parsable_elf) {
     for (i = 0; i < num_functions; i++) { // parsing all the functions
         AUDIT
         printf("searching for function %s\n", function_names[i]);
-        offset = fseek(the_file, 0,
-                       SEEK_SET); // moving to the beginning of the ELF file
+        fseek(the_file, 0,
+              SEEK_SET); // moving to the beginning of the ELF file
         while (1) {
             guard = fgets(buffer, LINE_SIZE, the_file);
             if (guard == NULL) {
@@ -958,7 +948,6 @@ unsigned long find_elf_parse_compile_time_address(char *parsable_elf) {
     FILE *the_file;
     char *guard;
     unsigned long function_start_address;
-    long corrector;
 
     AUDIT
     printf("finding elf_parse compile time address\n");
@@ -997,11 +986,8 @@ unsigned long find_elf_parse_compile_time_address(char *parsable_elf) {
 }
 
 void find_intermediate_zones(char *parsable_elf) {
-
     FILE *the_file;
     char *guard;
-    unsigned long function_start_address;
-    long corrector;
 
     AUDIT
     printf("finding intermediate zones\n");
@@ -1046,16 +1032,16 @@ out:
 int __real_main(int, char **);
 
 int __wrap_main(int argc, char **argv) {
-
     int ret;
     int i;
-    char *command;
+    // char *command;
 
     setup_memory_access_rules();
 
     asl_randomization = (unsigned long)elf_parse;
     AUDIT
-    printf("runtime address of elf_parse is %p\n", elf_parse);
+    printf("runtime address of elf_parse is %p\n",
+           (void *)(uintptr_t)elf_parse);
     asl_randomization =
         (unsigned long)((long)asl_randomization -
                         (long)find_elf_parse_compile_time_address(

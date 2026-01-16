@@ -8,8 +8,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "elf_parse.h"
-#include "head.h"
+#include "../include/elf_parse.h"
+#include "../include/head.h"
 
 void user_defined(instruction_record *, patch *);
 
@@ -53,7 +53,6 @@ void audit_block(instruction_record *the_record) {
            the_record->indirect_jump, (void *)the_record->middle_buffer,
            the_record->op, the_record->source, the_record->dest,
            the_record->data_size, the_record->instrumentation_instructions);
-    fflush(stdout);
 }
 
 char intermediate[LINE_SIZE];
@@ -61,15 +60,12 @@ int fd;
 // this function is essentially a trampoline for passing control to the
 // user-defined instrumentation function
 void build_intermediate_representation(void) {
-
-    int i;
-    int ret;
+    int i, ret;
 
     patches = (patch *)
         address1; // always use this reference for accessing the patch area
 
     for (i = 0; i < target_instructions; i++) {
-
         patches[i].functional_instr_size = 0;
 
         // just passing through user-defined stuff
@@ -79,7 +75,6 @@ void build_intermediate_representation(void) {
 
 uint64_t book_intermediate_target(uint64_t instruction_address,
                                   unsigned long instruction_size) {
-
     int i;
 
     for (i = 0; i < intermediate_zones_index; i++) {
@@ -100,19 +95,14 @@ uint64_t book_intermediate_target(uint64_t instruction_address,
 }
 
 void build_patches(void) {
-
-    int i;
+    int i, jmp_back_displacement, pos;
     unsigned long size;
     uint64_t instruction_address;
     int jmp_displacement;
     char *jmp_target;
     char v[128]; // this hosts the jmp binary
-    int jmp_back_displacement;
-    uint64_t patch_address;
-    int pos;
-    uint64_t effective_operand_address;
-    uint64_t effective_operand_displacement;
-    uint64_t intermediate_target;
+    uint64_t effective_operand_address, effective_operand_displacement,
+        intermediate_target, patch_address;
 
     uint64_t test_code = (uint64_t)the_patch_assembly;
     int test_code_size = 82; // this is taken from the compiled version of the
@@ -121,6 +111,9 @@ void build_patches(void) {
     patches = (patch *)address1;
 
     for (i = 0; i < target_instructions; i++) {
+        if (instructions[i].type == 'l') {
+            continue;
+        }
 
         // saving original instruction address
         instruction_address = patches[i].original_instruction_address =
@@ -338,6 +331,9 @@ void apply_patches(void) {
     unsigned short instruction_short_patch;
 
     for (i = 0; i < target_instructions; i++) {
+        if (instructions[i].type == 'l') {
+            continue;
+        }
         size = instructions[i].size;
         instruction_address = instructions[i].address;
         AUDIT

@@ -4,20 +4,31 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <sys/mman.h>
-#include <sys/types.h>
 #include <time.h>
 
 #include "ckpt_setup.h"
 
-double test_checkpoint(u_int8_t *area, int64_t value) {
-    int offset = 0;
+#ifndef WRITES
+#define WRITES 950
+#endif
+
+#ifndef READS
+#define READS 50
+#endif
+
+#ifndef CF
+#define CF 0
+#endif
+
+double test_checkpoint(uint8_t *area, int64_t value) {
+    int offset;
     __attribute__((unused)) int64_t read_value;
     clock_t begin, end;
 
     begin = clock();
     _set_ckpt(area);
+    offset = 0;
     for (int i = 0; i < WRITES; i++) {
         offset %= (ALLOCATOR_AREA_SIZE - 8);
         *(int64_t *)(area + offset) = value;
@@ -34,8 +45,8 @@ double test_checkpoint(u_int8_t *area, int64_t value) {
     return (double)(end - begin) / CLOCKS_PER_SEC;
 }
 
-double test_checkpoint_repeat(u_int8_t *area, int64_t value, int rep) {
-    int offset = 0;
+double test_checkpoint_repeat(uint8_t *area, int64_t value, int rep) {
+    int offset;
     __attribute__((unused)) int64_t read_value;
     clock_t begin, end;
 
@@ -60,58 +71,7 @@ double test_checkpoint_repeat(u_int8_t *area, int64_t value, int rep) {
     return (double)(end - begin) / CLOCKS_PER_SEC;
 }
 
-double restore_area_test(u_int8_t *area) {
-    u_int8_t *bitmap = area + 2 * ALLOCATOR_AREA_SIZE;
-    u_int8_t *src = area + ALLOCATOR_AREA_SIZE;
-    u_int8_t *dst = area;
-    u_int16_t current_word;
-    int target_offset;
-    clock_t begin, end;
-
-    begin = clock();
-    for (int offset = 0; offset < BITMAP_SIZE; offset += 8) {
-        if (*(u_int64_t *)(bitmap + offset) == 0) {
-            continue;
-        }
-        for (int i = 0; i < 8; i += 2) {
-            current_word = *(u_int16_t *)(bitmap + offset + i);
-            if (current_word == 0) {
-                continue;
-            }
-            for (int k = 0; k < 16; k++) {
-                if (((current_word >> k) & 1) == 1) {
-                    target_offset = ((offset + i) * 8 + k) * MOD;
-#if MOD == 8
-                    *(u_int64_t *)(dst + target_offset) =
-                        *(u_int64_t *)(src + target_offset);
-#elif MOD == 16
-                    *(__int128 *)(dst + target_offset) =
-                        *(__int128 *)(src + target_offset);
-#elif MOD == 32
-                    __m256i ckpt_value =
-                        _mm256_loadu_si256((__m256i *)(src + target_offset));
-                    _mm256_storeu_si256((__m256i *)(dst + target_offset),
-                                        ckpt_value);
-#elif MOD == 64
-                    __m512i ckpt_value =
-                        _mm512_load_si512((void *)(src + target_offset));
-                    _mm512_storeu_si512((void *)(dst + target_offset),
-                                        ckpt_value);
-#else
-                    memcpy(dst + target_offset, src + target_offset, MOD);
-#endif
-                }
-            }
-        }
-    }
-
-    memset(bitmap, 0, BITMAP_SIZE);
-
-    end = clock();
-    return (double)(end - begin) / CLOCKS_PER_SEC;
-}
-
-void clean_cache(u_int8_t *area) {
+void clean_cache(uint8_t *area) {
     int cache_line_size = __builtin_cpu_supports("sse2") ? 64 : 32;
     for (int i = 0; i < (2 * ALLOCATOR_AREA_SIZE + BITMAP_SIZE);
          i += (cache_line_size / 8)) {
@@ -120,25 +80,30 @@ void clean_cache(u_int8_t *area) {
 }
 
 int main(void) {
-    double wr_time = 0.0, restore_time = 0.0;
-    FILE *file;
     int64_t value;
-    unsigned long base_addr = 8UL * 1024UL * ALLOCATOR_AREA_SIZE;
-    size_t size = 2UL * ALLOCATOR_AREA_SIZE + BITMAP_SIZE;
+    unsigned long base_addr;
+    size_t size;
+    uint8_t *area;
+    double wr_time, restore_time;
+    clock_t begin, end;
+    FILE *file;
 
     _tls_setup();
 
     srand(42);
     value = rand() % INT64_MAX;
 
-    u_int8_t *area =
-        (u_int8_t *)mmap((void *)base_addr, size, PROT_READ | PROT_WRITE,
-                         MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0);
+    base_addr = 8UL * 1024UL * ALLOCATOR_AREA_SIZE;
+    size = 2UL * ALLOCATOR_AREA_SIZE + BITMAP_SIZE;
+    area = (uint8_t *)mmap((void *)base_addr, size, PROT_READ | PROT_WRITE,
+                           MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0);
     if (area == MAP_FAILED) {
         perror("mmap failed");
         return errno;
     }
 
+    wr_time = 0.0;
+    restore_time = 0.0;
     for (int i = 0; i < 128; i++) {
 #if CF == 1
         clean_cache(area);
@@ -147,7 +112,10 @@ int main(void) {
 #if CF == 1
         clean_cache(area);
 #endif
-        restore_time += restore_area_test(area);
+        begin = clock();
+        _restore_area(area);
+        end = clock();
+        restore_time += (double)(end - begin) / CLOCKS_PER_SEC;
     }
 
     file = fopen("ckpt_test_results.csv", "a");
@@ -176,7 +144,10 @@ int main(void) {
 #if CF == 1
             clean_cache(area);
 #endif
-            restore_time += restore_area_test(area);
+            begin = clock();
+            _restore_area(area);
+            end = clock();
+            restore_time += (double)(end - begin) / CLOCKS_PER_SEC;
         }
         fprintf(file, "0x%x,%d,%d,%d,%d,%d,%d,%f,%f\n", ALLOCATOR_AREA_SIZE, CF,
                 MOD, WRITES + READS, WRITES, READS, r, wr_time / 128,

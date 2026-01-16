@@ -22,15 +22,19 @@ set yrange [0:*]
 
 set key outside right top
 
-# Define colors
-set linetype 1 lc rgb "#00347d"  # 8_ckpt_time
-set linetype 2 lc rgb "#008dff"  # 8_ckpt_restore_time
-set linetype 3 lc rgb "#ff73bc"  # 16_ckpt_time
-set linetype 4 lc rgb "#c701ff"  # 16_ckpt_restore_time
-set linetype 5 lc rgb "#4ecb8d"  # 32_ckpt_time
-set linetype 6 lc rgb "#ff9d3a"  # 32_ckpt_restore_time
-set linetype 7 lc rgb "#f9e858"  # 64_ckpt_time
-set linetype 8 lc rgb "#d83034"  # 64_ckpt_restore_time
+## Define colors for easier readability (4 stacked bars)
+set linetype 1 lc rgb "#1f77b4"  # 8_ckpt_time (blue)
+set linetype 2 lc rgb "#aec7e8"  # 8_ckpt_restore_time (light blue)
+
+set linetype 3 lc rgb "#ff7f0e"  # 16_ckpt_time (orange)
+set linetype 4 lc rgb "#ffbb78"  # 16_ckpt_restore_time (light orange)
+
+set linetype 5 lc rgb "#2ca02c"  # 32_ckpt_time (green)
+set linetype 6 lc rgb "#98df8a"  # 32_ckpt_restore_time (light green)
+
+set linetype 7 lc rgb "#d62728"  # 64_ckpt_time (red)
+set linetype 8 lc rgb "#ff9896"  # 64_ckpt_restore_time (light red)
+
 
 
 set style fill solid border -1

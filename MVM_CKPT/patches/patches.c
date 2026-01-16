@@ -1,8 +1,8 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
-#include <sys/types.h>
 #include <unistd.h>
 
 #include "elf_parse.h"
@@ -78,15 +78,11 @@ char buffer[1024];
 // skipping the instrumentatn of this instruction
 
 void user_defined(instruction_record *actual_instruction, patch *actual_patch) {
-
-    int fd;
-    int ret;
-    int i;
+    int fd, ret;
 
     // here is stuff used for instrumenting applications in "PARSIR ubiquitous"
     // it replicates memory updates that are executed on malloc-ed/mmap-ed
     // memory areas at a given distance which is here set to 2^{21}
-    int offset = 0x200000;
     char *offset_string = "0x200000";
     char *aux;
 
@@ -168,17 +164,19 @@ void user_defined(instruction_record *actual_instruction, patch *actual_patch) {
     }
 }
 
-void ckpt_patch(instruction_record *actual_instruction, patch *actual_patch) {
+int ckpt_patch(instruction_record *actual_instruction, patch *actual_patch) {
     int fd, ret;
     // save the regs and the eflags before using in instrumentation
-    u_int8_t instructions[36] = {
-        0x65, 0x48, 0x89, 0x04, 0x25, 0x00, 0x00, 0x00, 0x00,           // mov %rax, %gs:0x00
-        0x65, 0x48, 0x89, 0x1c, 0x25, 0x08, 0x00, 0x00, 0x00,   // mov %rbx, %gs:0x08
-        0x9f,                                                                                          // lahf
-        0x65, 0x66, 0x89, 0x0c, 0x25, 0x10, 0x00, 0x00, 0x00,   // mov    %cx,%gs:0x10
-        0x65, 0x88, 0x24, 0x25, 0x14, 0x00, 0x00, 0x00              // mov    %ah,%gs:0x14
+    uint8_t instructions[35] = {
+        0x65, 0x48, 0x89, 0x04, 0x25, 0x00, 0x00, 0x00,
+        0x00, // mov %rax, %gs:0x00
+        0x65, 0x48, 0x89, 0x1c, 0x25, 0x08, 0x00, 0x00,
+        0x00,                                           // mov %rbx, %gs:0x08
+        0x9f,                                           // lahf
+        0x65, 0x88, 0x0c, 0x25, 0x10, 0x00, 0x00, 0x00, // mov %cl,%gs:0x10
+        0x65, 0x88, 0x24, 0x25, 0x14, 0x00, 0x00, 0x00  // mov %ah,%gs:0x14
     };
-    memcpy(actual_patch->code, (void *)instructions, 36);
+    memcpy(actual_patch->code, (void *)instructions, 35);
 
     sprintf(buffer, "lea %s, %%rbx\n", actual_instruction->dest);
     AUDIT printf("Load the store's address into rbx: %s", buffer);
@@ -221,7 +219,9 @@ void ckpt_patch(instruction_record *actual_instruction, patch *actual_patch) {
         exit(EXIT_FAILURE);
     }
 
-    memcpy((actual_patch->code) + 36, buffer, ret);
+    memcpy((actual_patch->code) + 35, buffer, ret);
 
     close(fd);
+
+    return 35 + ret;
 }

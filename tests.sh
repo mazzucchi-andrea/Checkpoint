@@ -37,24 +37,29 @@ done
 make clean
 cd ..
 
-# Tests with MVM example patch
+# Tests with MVM ckpt patch
 cd MVM
 rm mvm_test_results.csv
-echo "size,cache_flush,ops,writes,reads,time" > mvm_test_results.csv
+rm mvm_repeat_test_results.csv
+echo "size,cache_flush,mod,ops,writes,reads,ckpt_time,restore_time" > mvm_test_results.csv
+echo "size,cache_flush,mod,ops,writes,reads,repetitions,ckpt_time,restore_time" > mvm_repeat_test_results.csv
 
-for s in ${size[@]};
+for mod in ${mods[@]};
 do
-    for cf in ${cache_flush[@]};
+    for s in ${size[@]};
     do
-        for o in ${ops[@]}; 
+        for cf in ${cache_flush[@]};
         do
-            for w in ${writes[@]}; 
+            for o in ${ops[@]}; 
             do
-                w_ops=$(echo "$o * $w" | bc)
-                w_ops=${w_ops%.*}
-                r_ops=$(echo "$o - $w_ops" | bc)
-                make MEM_SIZE=$s WRITES=$w_ops READS=$r_ops CF=$cf
-                ./application/prog
+                for w in ${writes[@]}; 
+                do
+                    w_ops=$(echo "$o * $w" | bc)
+                    w_ops=${w_ops%.*}
+                    r_ops=$(echo "$o - $w_ops" | bc)
+                    make ALLOCATOR_AREA_SIZE=$s WRITES=$w_ops READS=$r_ops CF=$cf MOD=$mod
+                    ./application/prog
+                done
             done
         done
     done
