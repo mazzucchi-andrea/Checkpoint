@@ -1,15 +1,15 @@
 #include <emmintrin.h> // SSE2
-
+#include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <string.h>
-
+#include <stdlib.h>
 #include <sys/mman.h>
-
 #include <time.h>
 
+#include "ckpt.h"
+
 #ifndef SIZE
-#define SIZE 0x100000UL
+#define SIZE 0x100000
 #endif
 
 #ifndef WRITES
@@ -24,137 +24,134 @@
 #define CF 0
 #endif
 
-/* Save original values and set the bitarray bit before writing the new value and read */
-double test_checkpoint(int8_t *area, int8_t *area_copy, int64_t value) {
-    int offset = 0;
-    int64_t read_value;
+double test_checkpoint(uint8_t *area, int64_t value) {
+    int offset;
+    __attribute__((unused)) int64_t read_value;
     clock_t begin, end;
-    double time_spent;
+
     begin = clock();
-    memcpy(area_copy, area, SIZE);
+    set_ckpt(area);
+    offset = 0;
     for (int i = 0; i < WRITES; i++) {
-        offset %= (SIZE - 8 + 1);
+        offset %= (SIZE - 8);
         *(int64_t *)(area + offset) = value;
         offset += 4;
     }
     offset = 0;
     for (int i = 0; i < READS; i++) {
-        offset %= (SIZE - 8 + 1);
+        offset %= (SIZE - 8);
         read_value = *(int64_t *)(area + offset);
         offset += 4;
     }
     end = clock();
-    time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-    return time_spent;
+
+    return (double)(end - begin) / CLOCKS_PER_SEC;
 }
 
-double test_checkpoint_repeat(int8_t *area, int8_t *area_copy, int64_t value, int rep) {
+double test_checkpoint_repeat(uint8_t *area, int64_t value, int rep) {
     int offset = 0;
-    int64_t read_value;
+    __attribute__((unused)) int64_t read_value;
     clock_t begin, end;
-    double time_spent;
+
     begin = clock();
-    memcpy(area_copy, area, SIZE);
+    set_ckpt(area);
     for (int r = 0; r < rep; r++) {
         offset = 0;
         for (int i = 0; i < WRITES; i++) {
-            offset %= (SIZE - 8 + 1);
+            offset %= (SIZE - 8);
             *(int64_t *)(area + offset) = value;
             offset += 4;
         }
         offset = 0;
         for (int i = 0; i < READS; i++) {
-            offset %= (SIZE - 8 + 1);
+            offset %= (SIZE - 8);
             read_value = *(int64_t *)(area + offset);
             offset += 4;
         }
     }
     end = clock();
-    time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-    return time_spent;
+
+    return (double)(end - begin) / CLOCKS_PER_SEC;
 }
 
-double restore_area(int8_t *area, int8_t *area_copy) {
-    clock_t begin, end;
-    double time_spent;
-    begin = clock();
-    memcpy(area, area_copy, SIZE);
-    end = clock();
-    time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-    return time_spent;
-}
-
-void clean_cache(int8_t *area) {
+void clean_cache(uint8_t *area) {
     int cache_line_size = __builtin_cpu_supports("sse2") ? 64 : 32;
-    for (int i = 0; i < SIZE; i += (cache_line_size / 8)) {
-        _mm_clflush(area + i);
+    for (int i = 0; i < (SIZE * 2); i += (cache_line_size / 8)) {
+        _mm_clflush((void *)(area + i));
     }
 }
 
-int main(int argc, char *argv[]) {
-    double wr_time = 0, restore_time = 0;
-    char *endptr;
-    FILE *file;
+int main(void) {
+    double wr_time, restore_time;
+    unsigned long base_addr;
+    clock_t begin, end;
+    uint8_t *area;
     int64_t value;
+    size_t size;
+    FILE *file;
 
     srand(42);
-    value = rand() % (0xFFFFFFFFFFFFFFFF - 1 + 1) + 1;
+    value = rand() % INT64_MAX;
 
-    size_t alignment = 8 * (1024 * SIZE);
-    int8_t *area = (int8_t *)aligned_alloc(alignment, SIZE);
-    if (area == NULL) {
-        perror("aligned_alloc failed\n");
-        return EXIT_FAILURE;
+    base_addr = 8UL * 1024UL * SIZE;
+    size = SIZE * 2;
+    area = (uint8_t *)mmap((void *)base_addr, size, PROT_READ | PROT_WRITE,
+                           MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, 0, 0);
+    if (area == MAP_FAILED) {
+        perror("mmap failed");
+        return errno;
     }
-    int8_t *area_copy = (int8_t *)mmap(NULL, SIZE, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
-    if (area == NULL) {
-        perror("aligned_alloc failed\n");
-        return EXIT_FAILURE;
-    }
-    memset(area, 0, SIZE);
-    memset(area_copy, 0, SIZE);
-    clean_cache(area);
 
+    wr_time = 0.0;
+    restore_time = 0.0;
     for (int i = 0; i < 128; i++) {
 #if CF == 1
         clean_cache(area);
 #endif
-        wr_time += test_checkpoint(area, area_copy, value);
+        wr_time += test_checkpoint(area, value);
 #if CF == 1
         clean_cache(area);
 #endif
-        restore_time += restore_area(area, area_copy);
+        begin = clock();
+        restore_area(area);
+        end = clock();
+        restore_time += (double)(end - begin) / CLOCKS_PER_SEC;
     }
 
     file = fopen("simple_ckpt_test_results.csv", "a");
     if (file == NULL) {
-        fprintf(stderr, "Error opening file!\n");
-        return 1;
+        fprintf(stderr, "Error opening simple_ckpt_test_results.csv\n");
+        return errno;
     }
-    fprintf(file, "0x%lx,%d,%d,%d,%d,%f,%f\n", SIZE, CF, WRITES + READS, WRITES, READS, wr_time / 128,
-            restore_time / 128);
+    fprintf(file, "0x%x,%d,%d,%d,%d,%f,%f\n", SIZE, CF, WRITES + READS, WRITES,
+            READS, wr_time / 128, restore_time / 128);
     fclose(file);
 
     file = fopen("simple_ckpt_repeat_test_results.csv", "a");
     if (file == NULL) {
-        fprintf(stderr, "Error opening file!\n");
-        return 1;
+        fprintf(stderr, "Error opening simple_ckpt_repeat_test_results.csv\n");
+        return errno;
     }
 
     for (int r = 2; r <= 10; r += 2) {
+        wr_time = 0.0;
+        restore_time = 0.0;
         for (int i = 0; i < 128; i++) {
 #if CF == 1
             clean_cache(area);
 #endif
-            wr_time += test_checkpoint_repeat(area, area_copy, value, r);
+            wr_time += test_checkpoint_repeat(area, value, r);
 #if CF == 1
             clean_cache(area);
 #endif
-            restore_time += restore_area(area, area_copy);
+            begin = clock();
+            restore_area(area);
+            end = clock();
+            restore_time += (double)(end - begin) / CLOCKS_PER_SEC;
         }
 
-        fprintf(file, "0x%lx,%d,%d,%d,%d,%d,%f,%f\n", SIZE, CF, WRITES + READS, WRITES, READS, r, wr_time / 128,
-                restore_time / 128);
+        fprintf(file, "0x%x,%d,%d,%d,%d,%d,%f,%f\n", SIZE, CF, WRITES + READS,
+                WRITES, READS, r, wr_time / 128, restore_time / 128);
     }
     fclose(file);
 

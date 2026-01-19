@@ -3,7 +3,7 @@
 declare -a cache_flush=(0 1)
 declare -a ops=(1000 10000 100000 1000000)
 declare -a size=(0x100000 0x200000 0x400000)
-declare -a mods=(64 128 256 512)
+declare -a mods=(8 16 32 64)
 declare -a reps=(2 4 6 8 10)
 
 DATAFILE="plot_data.csv"

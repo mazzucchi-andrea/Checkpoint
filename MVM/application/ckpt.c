@@ -1,29 +1,13 @@
-#include <asm/prctl.h>
 #include <immintrin.h> // AVX
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <sys/mman.h>
 
-#include "ckpt_setup.h"
+#include "ckpt.h"
 
-extern int arch_prctl(int code, unsigned long addr);
-
-void _tls_setup() {
-    void *addr = mmap(NULL, 128, PROT_READ | PROT_WRITE,
-                      MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
-    if (addr == MAP_FAILED) {
-        perror("tls_setup fail caused by mmap");
-        exit(EXIT_FAILURE);
-    }
-    if (arch_prctl(ARCH_SET_GS, (unsigned long)addr)) {
-        perror("tls_setup fail caused by arch_prctl");
-        exit(EXIT_FAILURE);
-    }
+void set_ckpt(uint8_t *area) {
+    memset(area + ALLOCATOR_AREA_SIZE * 2, 0, BITMAP_SIZE);
 }
 
-void _restore_area(uint8_t *area) {
+void restore_area(uint8_t *area) {
     uint8_t *bitmap = area + 2 * ALLOCATOR_AREA_SIZE;
     uint8_t *src = area + ALLOCATOR_AREA_SIZE;
     uint8_t *dst = area;
@@ -60,15 +44,10 @@ void _restore_area(uint8_t *area) {
                         _mm512_load_si512((void *)(src + target_offset));
                     _mm512_store_si512((void *)(dst + target_offset),
                                        ckpt_value);
-
 #endif
                 }
             }
         }
     }
     memset(bitmap, 0, BITMAP_SIZE);
-}
-
-void _set_ckpt(uint8_t *area) {
-    memset(area + 2 * ALLOCATOR_AREA_SIZE, 0, BITMAP_SIZE);
 }

@@ -12,7 +12,7 @@ typedef struct {
     char writes[32];
     char reads[32];
     char ckpt_time[32];
-    char ckpt_restore_time[32];
+    char restore_time[32];
 } CkptRow;
 
 int main(int argc, char *argv[]) {
@@ -50,52 +50,58 @@ int main(int argc, char *argv[]) {
     output_file = fopen("plot_data.csv", "w");
 
     if (!ckpt_file || !output_file) {
-        perror("Error opening files");
+        perror("Error opening files!");
         return EXIT_FAILURE;
     }
 
-    fprintf(output_file, "size,cache_flush,ops,writes,reads,64_ckpt_time,64_ckpt_restore_time,128_ckpt_time,128_ckpt_"
-                         "restore_time,256_ckpt_time,256_ckpt_restore_time,512_ckpt_time,512_ckpt_restore_time\n");
+    fprintf(output_file, "size,cache_flush,ops,writes,reads,8_ckpt_time,8_"
+                         "restore_time,16_ckpt_time,16_restore_time,32_ckpt_"
+                         "time,32_restore_time,64_ckpt_time,64_restore_time\n");
 
+    CkptRow ckpt_rows_8[14];
+    CkptRow ckpt_rows_16[14];
+    CkptRow ckpt_rows_32[14];
     CkptRow ckpt_rows_64[14];
-    CkptRow ckpt_rows_128[14];
-    CkptRow ckpt_rows_256[14];
-    CkptRow ckpt_rows_512[14];
 
     CkptRow ckpt_row;
     int i = 0, j = 0, k = 0, l = 0;
     fgets(line, sizeof(line), ckpt_file);
     while (fgets(line, sizeof(line), ckpt_file)) {
-        sscanf(line, "%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%s", ckpt_row.size, ckpt_row.cache_flush, ckpt_row.mod,
-               ckpt_row.ops, ckpt_row.writes, ckpt_row.reads, ckpt_row.ckpt_time, ckpt_row.ckpt_restore_time);
-        if (strtol(ckpt_row.size, &endptr, 16) != size || strtol(ckpt_row.cache_flush, &endptr, 10) != cache_flush ||
+        sscanf(line, "%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%s",
+               ckpt_row.size, ckpt_row.cache_flush, ckpt_row.mod, ckpt_row.ops,
+               ckpt_row.writes, ckpt_row.reads, ckpt_row.ckpt_time,
+               ckpt_row.restore_time);
+        if (strtol(ckpt_row.size, &endptr, 16) != size ||
+            strtol(ckpt_row.cache_flush, &endptr, 10) != cache_flush ||
             strtol(ckpt_row.ops, &endptr, 10) != ops) {
             continue;
         }
-        if (strcmp(ckpt_row.mod, "64") == 0) {
-            ckpt_rows_64[i] = ckpt_row;
+        if (strcmp(ckpt_row.mod, "8") == 0) {
+            ckpt_rows_8[i] = ckpt_row;
             i++;
         }
-        if (strcmp(ckpt_row.mod, "128") == 0) {
-            ckpt_rows_128[j] = ckpt_row;
+        if (strcmp(ckpt_row.mod, "16") == 0) {
+            ckpt_rows_16[j] = ckpt_row;
             j++;
         }
-        if (strcmp(ckpt_row.mod, "256") == 0) {
-            ckpt_rows_256[k] = ckpt_row;
+        if (strcmp(ckpt_row.mod, "32") == 0) {
+            ckpt_rows_32[k] = ckpt_row;
             k++;
         }
-        if (strcmp(ckpt_row.mod, "512") == 0) {
-            ckpt_rows_512[l] = ckpt_row;
+        if (strcmp(ckpt_row.mod, "64") == 0) {
+            ckpt_rows_64[l] = ckpt_row;
             l++;
         }
     }
 
     for (i = 0; i < 14; i++) {
-        fprintf(output_file, "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n", ckpt_rows_64[i].size,
-                ckpt_rows_64[i].cache_flush, ckpt_rows_64[i].ops, ckpt_rows_64[i].writes, ckpt_rows_64[i].reads,
-                ckpt_rows_64[i].ckpt_time, ckpt_rows_64[i].ckpt_restore_time, ckpt_rows_128[i].ckpt_time,
-                ckpt_rows_128[i].ckpt_restore_time, ckpt_rows_256[i].ckpt_time, ckpt_rows_256[i].ckpt_restore_time,
-                ckpt_rows_512[i].ckpt_time, ckpt_rows_512[i].ckpt_restore_time);
+        fprintf(output_file, "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n",
+                ckpt_rows_8[i].size, ckpt_rows_8[i].cache_flush,
+                ckpt_rows_8[i].ops, ckpt_rows_8[i].writes, ckpt_rows_8[i].reads,
+                ckpt_rows_8[i].ckpt_time, ckpt_rows_8[i].restore_time,
+                ckpt_rows_16[i].ckpt_time, ckpt_rows_16[i].restore_time,
+                ckpt_rows_32[i].ckpt_time, ckpt_rows_32[i].restore_time,
+                ckpt_rows_64[i].ckpt_time, ckpt_rows_64[i].restore_time);
     }
     fclose(output_file);
 
