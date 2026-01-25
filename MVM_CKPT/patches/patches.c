@@ -18,8 +18,8 @@ void the_patch(unsigned long, unsigned long) __attribute__((used));
 // the pointers to the instruction metadata and CPU snapshot
 
 void the_patch(unsigned long mem, unsigned long regs) {
-    instruction_record *instruction = (instruction_record *)mem;
-    target_address *target;
+    instruction_record* instruction = (instruction_record*)mem;
+    target_address* target;
     unsigned long A = 0, B = 0;
     unsigned long address;
 
@@ -31,7 +31,7 @@ void the_patch(unsigned long mem, unsigned long regs) {
     if (instruction->effective_operand_address != 0x0) {
         printf("__mvm: accessed address is %p - data size is %d access type is "
                "%c\n",
-               (void *)instruction->effective_operand_address,
+               (void*)instruction->effective_operand_address,
                instruction->data_size, instruction->type);
     } else {
         target = &(instruction->target);
@@ -40,18 +40,16 @@ void the_patch(unsigned long mem, unsigned long regs) {
                target->displacement, target->base_index, target->scale_index,
                target->scale);
         if (target->base_index) {
-            memcpy((char *)&A, (char *)(regs + 8 * (target->base_index - 1)),
-                   8);
+            memcpy((char*)&A, (char*)(regs + 8 * (target->base_index - 1)), 8);
         }
         if (target->scale_index) {
-            memcpy((char *)&B, (char *)(regs + 8 * (target->scale_index - 1)),
-                   8);
+            memcpy((char*)&B, (char*)(regs + 8 * (target->scale_index - 1)), 8);
         }
         address = (unsigned long)((long)target->displacement + (long)A +
                                   (long)((long)B * (long)target->scale));
         printf("__mvm: accessed address is %p - data size is %d - access type "
                "is %c\n",
-               (void *)address, instruction->data_size, instruction->type);
+               (void*)address, instruction->data_size, instruction->type);
     }
     fflush(stdout);
 
@@ -77,7 +75,7 @@ char buffer[1024];
 // this function with no management of the pointed areas menas that you are
 // skipping the instrumentatn of this instruction
 
-void user_defined(instruction_record *actual_instruction, patch *actual_patch) {
+void user_defined(instruction_record* actual_instruction, patch* actual_patch) {
 
     int fd;
     int ret;
@@ -87,8 +85,8 @@ void user_defined(instruction_record *actual_instruction, patch *actual_patch) {
     // it replicates memory updates that are executed on malloc-ed/mmap-ed
     // memory areas at a given distance which is here set to 2^{21}
     int offset = 0x200000;
-    char *offset_string = "0x200000";
-    char *aux;
+    char* offset_string = "0x200000";
+    char* aux;
 
     // check if the instructon is a non RIP-relative store
     // if it is, it can be skipped, otherwise it needs ot be instrumented
@@ -116,8 +114,8 @@ void user_defined(instruction_record *actual_instruction, patch *actual_patch) {
             aux = strtok(buffer, "(");
             sprintf(buffer, "%s %s,%p%s\n", actual_instruction->op,
                     actual_instruction->source,
-                    (void *)(strtol(aux, NULL, 16) +
-                             strtol(offset_string, NULL, 16)),
+                    (void*)(strtol(aux, NULL, 16) +
+                            strtol(offset_string, NULL, 16)),
                     (actual_instruction->dest + strlen(aux)));
         }
 
@@ -168,11 +166,11 @@ void user_defined(instruction_record *actual_instruction, patch *actual_patch) {
     }
 }
 
-int ckpt_patch(instruction_record *actual_instruction, patch *actual_patch) {
+int ckpt_patch(instruction_record* actual_instruction, patch* actual_patch) {
     int fd, ret;
     uint8_t instructions[9] = {0x65, 0x48, 0x89, 0x0c, 0x25,
                                0x10, 0x00, 0x00, 0x00}; // mov %rcx, %gs:0x10
-    memcpy(actual_patch->code, (void *)instructions, 9);
+    memcpy(actual_patch->code, (void*)instructions, 9);
 
     sprintf(buffer, "lea %s, %%rcx\n", actual_instruction->dest);
     AUDIT printf("Load the store's address into rcx: %s", buffer);

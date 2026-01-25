@@ -1,8 +1,8 @@
 #!/bin/bash
 
-declare -a cache_flush=(0 1)
-declare -a ops=(1000 10000 100000 1000000)
-declare -a size=(0x100000 0x200000 0x400000)
+declare -a cache_flush=(0)
+declare -a ops=(1000)
+declare -a size=(0x100000)
 declare -a mods=(8 16 32 64)
 declare -a reps=(2 4 6 8 10)
 
@@ -14,14 +14,14 @@ PLOT_REP_COMPARE="plot_rep_comparison.gp"
 rm -r plots
 mkdir plots
 mkdir plots/ckpt_comparison
-mkdir plots/ckpt_comparison/cf_disabled
-mkdir plots/ckpt_comparison/cf_enabled
+mkdir plots/ckpt_comparison/ckpt
+mkdir plots/ckpt_comparison/restore
 mkdir plots/mod_comparison
-mkdir plots/mod_comparison/cf_disabled
-mkdir plots/mod_comparison/cf_enabled
+mkdir plots/mod_comparison/ckpt
+mkdir plots/mod_comparison/restore
 mkdir plots/rep_comparison
-mkdir plots/rep_comparison/cf_disabled
-mkdir plots/rep_comparison/cf_enabled
+mkdir plots/rep_comparison/ckpt
+mkdir plots/rep_comparison/restore
 
 # --- Error Checking ---
 if ! command -v gnuplot &> /dev/null

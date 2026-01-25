@@ -17,8 +17,8 @@
 
 #define BITMAP_SIZE (ALLOCATOR_AREA_SIZE / MOD) / 8
 
-void set_ckpt(uint8_t *);
+void set_ckpt(uint8_t*);
 
-void restore_area(uint8_t *);
+void restore_area(uint8_t*);
 
 #endif

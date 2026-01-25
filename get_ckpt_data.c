@@ -11,9 +11,11 @@ typedef struct {
     char ops[32];
     char writes[32];
     char reads[32];
-    char ckpt_time[32];
-    char restore_time[32];
-} CkptRow;
+    char ckpt_mean[32];
+    char ckpt_ci[32];
+    char restore_mean[32];
+    char restore_ci[32];
+} GridCkptRow;
 
 typedef struct {
     char size[32];
@@ -22,9 +24,11 @@ typedef struct {
     char ops[32];
     char writes[32];
     char reads[32];
-    char ckpt_time[32];
-    char restore_time[32];
-} MVMRow;
+    char ckpt_mean[32];
+    char ckpt_ci[32];
+    char restore_mean[32];
+    char restore_ci[32];
+} CPatchRow;
 
 typedef struct {
     char size[32];
@@ -32,14 +36,16 @@ typedef struct {
     char ops[32];
     char writes[32];
     char reads[32];
-    char ckpt_time[32];
-    char restore_time[32];
+    char ckpt_mean[32];
+    char ckpt_ci[32];
+    char restore_mean[32];
+    char restore_ci[32];
 } SimpleCkptRow;
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
     FILE *mvm_file, *simple_ckpt_file, *ckpt_file, *output_file;
     char line[MAX_LINE_LENGTH];
-    char *endptr;
+    char* endptr;
     int size, cache_flush, mod, ops;
 
     if (argc < 5) {
@@ -68,7 +74,7 @@ int main(int argc, char *argv[]) {
 
     ops = strtol(argv[4], &endptr, 10);
     if (*endptr != '\0' || ops <= 0) {
-        fprintf(stderr, "Ops must be an integer greater or eqaul to 1.\n");
+        fprintf(stderr, "Ops must be an integer greater or equal to 1.\n");
         return EXIT_FAILURE;
     }
 
@@ -85,46 +91,53 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    fprintf(output_file,
-            "size,cache_flush,mod,ops,writes,reads,ckpt_time,ckpt_restore_time,"
-            "mvm_time,mvm_restore_time,simple_ckpt_time,simple_restore_time\n");
+    fprintf(output_file, "size,cache_flush,mod,ops,writes,reads,"
+                         "grid_ckpt_bs_mean,grid_ckpt_bs_ci,grid_ckpt_bs_"
+                         "restore_mean,grid_ckpt_bs_restore_ci,"
+                         "c_grid_ckpt_bs_mean,c_grid_ckpt_bs_ci,c_grid_ckpt_bs_"
+                         "restore_mean,c_grid_ckpt_bs_restore_ci,"
+                         "simple_ckpt_mean,simple_ckpt_ci,simple_restore_mean,"
+                         "simple_restore_ci\n");
 
-    CkptRow ckpt_row;
-    MVMRow mvm_row;
+    GridCkptRow grid_row;
+    CPatchRow c_patch_row;
     SimpleCkptRow simple_ckpt_row;
 
     fgets(line, sizeof(line), ckpt_file);
     while (fgets(line, sizeof(line), ckpt_file)) {
-        sscanf(line, "%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%s",
-               ckpt_row.size, ckpt_row.cache_flush, ckpt_row.mod, ckpt_row.ops,
-               ckpt_row.writes, ckpt_row.reads, ckpt_row.ckpt_time,
-               ckpt_row.restore_time);
-        if (strtol(ckpt_row.size, &endptr, 16) != size ||
-            strtol(ckpt_row.cache_flush, &endptr, 10) != cache_flush ||
-            strtol(ckpt_row.mod, &endptr, 10) != mod ||
-            strtol(ckpt_row.ops, &endptr, 10) != ops) {
+        sscanf(line, "%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%s",
+               grid_row.size, grid_row.cache_flush, grid_row.mod, grid_row.ops,
+               grid_row.writes, grid_row.reads, grid_row.ckpt_mean,
+               grid_row.ckpt_ci, grid_row.restore_mean, grid_row.restore_ci);
+        if (strtol(grid_row.size, &endptr, 16) != size ||
+            strtol(grid_row.cache_flush, &endptr, 10) != cache_flush ||
+            strtol(grid_row.mod, &endptr, 10) != mod ||
+            strtol(grid_row.ops, &endptr, 10) != ops) {
             continue;
         }
-        fprintf(output_file, "%s,%s,%s,%s,%s,%s,%s,%s", ckpt_row.size,
-                ckpt_row.cache_flush, ckpt_row.mod, ckpt_row.ops,
-                ckpt_row.writes, ckpt_row.reads, ckpt_row.ckpt_time,
-                ckpt_row.restore_time);
+        fprintf(output_file, "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s", grid_row.size,
+                grid_row.cache_flush, grid_row.mod, grid_row.ops,
+                grid_row.writes, grid_row.reads, grid_row.ckpt_mean,
+                grid_row.ckpt_ci, grid_row.restore_mean, grid_row.restore_ci);
 
         fseek(mvm_file, 0, SEEK_SET);
         fgets(line, sizeof(line), mvm_file);
         while (fgets(line, sizeof(line), mvm_file)) {
-            sscanf(line, "%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%s",
-                   mvm_row.size, mvm_row.cache_flush, mvm_row.mod, mvm_row.ops,
-                   mvm_row.writes, mvm_row.reads, mvm_row.ckpt_time,
-                   mvm_row.restore_time);
-            if (!strcmp(ckpt_row.size, mvm_row.size) &&
-                !strcmp(ckpt_row.cache_flush, mvm_row.cache_flush) &&
-                !strcmp(ckpt_row.mod, mvm_row.mod) &&
-                !strcmp(ckpt_row.ops, mvm_row.ops) &&
-                !strcmp(ckpt_row.writes, mvm_row.writes) &&
-                !strcmp(ckpt_row.reads, mvm_row.reads)) {
-                fprintf(output_file, ",%s,%s", mvm_row.ckpt_time,
-                        mvm_row.restore_time);
+            sscanf(line,
+                   "%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%s",
+                   c_patch_row.size, c_patch_row.cache_flush, c_patch_row.mod,
+                   c_patch_row.ops, c_patch_row.writes, c_patch_row.reads,
+                   c_patch_row.ckpt_mean, c_patch_row.ckpt_ci,
+                   c_patch_row.restore_mean, c_patch_row.restore_ci);
+            if (!strcmp(grid_row.size, c_patch_row.size) &&
+                !strcmp(grid_row.cache_flush, c_patch_row.cache_flush) &&
+                !strcmp(grid_row.mod, c_patch_row.mod) &&
+                !strcmp(grid_row.ops, c_patch_row.ops) &&
+                !strcmp(grid_row.writes, c_patch_row.writes) &&
+                !strcmp(grid_row.reads, c_patch_row.reads)) {
+                fprintf(output_file, ",%s,%s,%s,%s", c_patch_row.ckpt_mean,
+                        c_patch_row.ckpt_ci, c_patch_row.restore_mean,
+                        c_patch_row.restore_ci);
                 break;
             }
         }
@@ -132,18 +145,21 @@ int main(int argc, char *argv[]) {
         fseek(simple_ckpt_file, 0, SEEK_SET);
         fgets(line, sizeof(line), simple_ckpt_file);
         while (fgets(line, sizeof(line), simple_ckpt_file)) {
-            sscanf(line, "%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%s",
+            sscanf(line, "%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%[^,],%s",
                    simple_ckpt_row.size, simple_ckpt_row.cache_flush,
                    simple_ckpt_row.ops, simple_ckpt_row.writes,
-                   simple_ckpt_row.reads, simple_ckpt_row.ckpt_time,
-                   simple_ckpt_row.restore_time);
-            if (!strcmp(ckpt_row.size, simple_ckpt_row.size) &&
-                !strcmp(ckpt_row.cache_flush, simple_ckpt_row.cache_flush) &&
-                !strcmp(ckpt_row.ops, simple_ckpt_row.ops) &&
-                !strcmp(ckpt_row.writes, simple_ckpt_row.writes) &&
-                !strcmp(ckpt_row.reads, simple_ckpt_row.reads)) {
-                fprintf(output_file, ",%s,%s\n", simple_ckpt_row.ckpt_time,
-                        simple_ckpt_row.restore_time);
+                   simple_ckpt_row.reads, simple_ckpt_row.ckpt_mean,
+                   simple_ckpt_row.ckpt_ci, simple_ckpt_row.restore_mean,
+                   simple_ckpt_row.restore_ci);
+            if (!strcmp(grid_row.size, simple_ckpt_row.size) &&
+                !strcmp(grid_row.cache_flush, simple_ckpt_row.cache_flush) &&
+                !strcmp(grid_row.ops, simple_ckpt_row.ops) &&
+                !strcmp(grid_row.writes, simple_ckpt_row.writes) &&
+                !strcmp(grid_row.reads, simple_ckpt_row.reads)) {
+                fprintf(output_file, ",%s,%s,%s,%s\n",
+                        simple_ckpt_row.ckpt_mean, simple_ckpt_row.ckpt_ci,
+                        simple_ckpt_row.restore_mean,
+                        simple_ckpt_row.restore_ci);
                 break;
             }
         }

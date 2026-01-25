@@ -41,31 +41,30 @@ void the_patch(unsigned long, unsigned long) __attribute__((used));
 // the pointers to the instruction metadata and CPU snapshot
 
 void the_patch(unsigned long mem, unsigned long regs) {
-    instruction_record *instruction = (instruction_record *)mem;
-    target_address *target;
+    instruction_record* instruction = (instruction_record*)mem;
+    target_address* target;
     unsigned long A = 0, B = 0;
     uint8_t *address, *base, *area_ckpt, *bitmap;
     uint8_t bit;
     uint16_t bitmask, word;
-    uint16_t *word_ptr;
+    uint16_t* word_ptr;
     uint64_t offset;
     uint64_t temp;
 
     // get the address
     if (instruction->effective_operand_address != 0x0) {
-        address = (uint8_t *)instruction->effective_operand_address;
+        address = (uint8_t*)instruction->effective_operand_address;
     } else {
         target = &(instruction->target);
-        memcpy((char *)&A, (char *)(regs + 8 * (target->base_index - 1)), 8);
+        memcpy((char*)&A, (char*)(regs + 8 * (target->base_index - 1)), 8);
         if (target->scale_index) {
-            memcpy((char *)&B, (char *)(regs + 8 * (target->scale_index - 1)),
-                   8);
+            memcpy((char*)&B, (char*)(regs + 8 * (target->scale_index - 1)), 8);
         }
-        address = (uint8_t *)((long)target->displacement + (long)A +
-                              (long)((long)B * (long)target->scale));
+        address = (uint8_t*)((long)target->displacement + (long)A +
+                             (long)((long)B * (long)target->scale));
     }
 
-    base = (uint8_t *)((uint64_t)address & (~(ALLOCATOR_AREA_SIZE - 1)));
+    base = (uint8_t*)((uint64_t)address & (~(ALLOCATOR_AREA_SIZE - 1)));
     area_ckpt = base + ALLOCATOR_AREA_SIZE;
     bitmap = base + 2 * ALLOCATOR_AREA_SIZE;
     offset = (uint64_t)address & (ALLOCATOR_AREA_SIZE - 1);
@@ -75,22 +74,22 @@ void the_patch(unsigned long mem, unsigned long regs) {
         temp = offset >> LOG2(MOD);
         bit = temp & 15;
         bitmask = 1 << bit;
-        word_ptr = (uint16_t *)(bitmap + (temp >> 4) * 2);
+        word_ptr = (uint16_t*)(bitmap + (temp >> 4) * 2);
         if (!(*word_ptr & bitmask)) {
             *word_ptr |= bitmask;
 #if MOD == 8
-            *(uint64_t *)(area_ckpt + offset) = *(uint64_t *)(base + offset);
+            *(uint64_t*)(area_ckpt + offset) = *(uint64_t*)(base + offset);
 #elif MOD == 16
-            __m128i ckpt_value = _mm_load_si128((__m128i *)(base + offset));
-            _mm_store_si128((__m128i *)(area_ckpt + offset), ckpt_value);
+            __m128i ckpt_value = _mm_load_si128((__m128i*)(base + offset));
+            _mm_store_si128((__m128i*)(area_ckpt + offset), ckpt_value);
 #elif MOD == 32
-            __m256i ckpt_value = _mm256_loadu_si256((__m256i *)(base + offset));
-            _mm256_storeu_si256((__m256i *)(area_ckpt + offset), ckpt_value);
+            __m256i ckpt_value = _mm256_loadu_si256((__m256i*)(base + offset));
+            _mm256_storeu_si256((__m256i*)(area_ckpt + offset), ckpt_value);
 #elif MOD == 64
-            __m512i ckpt_value = _mm512_load_si512((void *)(base + offset));
-            _mm512_store_si512((void *)(area_ckpt + offset), ckpt_value);
+            __m512i ckpt_value = _mm512_load_si512((void*)(base + offset));
+            _mm512_store_si512((void*)(area_ckpt + offset), ckpt_value);
 #else
-            memcpy((void *)(base + offset), (void *)(area_ckpt + offset));
+            memcpy((void*)(base + offset), (void*)(area_ckpt + offset));
 #endif
         }
 
@@ -105,20 +104,20 @@ void the_patch(unsigned long mem, unsigned long regs) {
     temp = offset >> LOG2(MOD);
     bit = temp & 15;
     bitmask = 1 << bit;
-    word_ptr = (uint16_t *)(bitmap + (temp >> 4) * 2);
+    word_ptr = (uint16_t*)(bitmap + (temp >> 4) * 2);
     if (!(*word_ptr & bitmask)) {
         *word_ptr |= bitmask;
 #if MOD == 8
-        *(uint64_t *)(area_ckpt + offset) = *(uint64_t *)(base + offset);
+        *(uint64_t*)(area_ckpt + offset) = *(uint64_t*)(base + offset);
 #elif MOD == 16
-        __m128i ckpt_value = _mm_load_si128((__m128i *)(base + offset));
-        _mm_store_si128((__m128i *)(area_ckpt + offset), ckpt_value);
+        __m128i ckpt_value = _mm_load_si128((__m128i*)(base + offset));
+        _mm_store_si128((__m128i*)(area_ckpt + offset), ckpt_value);
 #elif MOD == 32
-        __m256i ckpt_value = _mm256_loadu_si256((__m256i *)(base + offset));
-        _mm256_storeu_si256((__m256i *)(area_ckpt + offset), ckpt_value);
+        __m256i ckpt_value = _mm256_loadu_si256((__m256i*)(base + offset));
+        _mm256_storeu_si256((__m256i*)(area_ckpt + offset), ckpt_value);
 #else
-        __m512i ckpt_value = _mm512_load_si512((void *)(base + offset));
-        _mm512_storeu_si512((void *)(area_ckpt + offset), ckpt_value);
+        __m512i ckpt_value = _mm512_load_si512((void*)(base + offset));
+        _mm512_storeu_si512((void*)(area_ckpt + offset), ckpt_value);
 #endif
     }
 }
@@ -142,6 +141,6 @@ char buffer[1024];
 // this function with no management of the pointed areas menas that you are
 // skipping the instrumentatn of this instruction
 
-void user_defined(instruction_record *actual_instruction, patch *actual_patch) {
+void user_defined(instruction_record* actual_instruction, patch* actual_patch) {
     // not used in this patch
 }

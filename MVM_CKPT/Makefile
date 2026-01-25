@@ -8,7 +8,7 @@ APP_OBJ = $(APP)/prog.o
 TARGET_MODULES= prog.c
 #TARGET_FUNCTIONS="<a>:","<b>:" this is an example usage
 TARGET_FUNCTIONS="<test_checkpoint>:","<test_checkpoint_repeat>:"
-LIBS =
+LIBS = -lm
 
 INCLUDE = $(PWD)/include
 OBJ = $(PWD)/obj
@@ -45,7 +45,7 @@ ADDITIONAL_FLAGS = -O3 -DCKPT -DAPPLY_PATCHES #-DVERBOSE
 
 #CKPT FLAGS
 ALLOCATOR_AREA_SIZE=0x100000
-MOD=64
+MOD=8
 
 THE_VM = -DVM_NAME=\"MVM\"
 
