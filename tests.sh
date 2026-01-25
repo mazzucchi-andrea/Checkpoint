@@ -1,8 +1,8 @@
 #!/bin/bash
 
-declare -a cache_flush=(0)
-declare -a ops=(1000 10000)
-declare -a size=(0x100000)
+declare -a cache_flush=(0 1)
+declare -a ops=(1000 10000 100000 1000000)
+declare -a size=(0x100000 0x200000 0x400000)
 declare -a mods=(8 16 32 64)
 declare -a writes=(0.95 0.90 0.85 0.80 0.75 0.70 0.65 0.60 0.55 0.50 0.45 0.40 0.35 0.30)
 
