@@ -8,31 +8,31 @@
 #include "elf_parse.h"
 #include "head.h"
 
-void user_defined(instruction_record *, patch *);
+void user_defined(instruction_record*, patch*);
 #if CKPT
-int ckpt_patch(instruction_record *, patch *);
+int ckpt_patch(instruction_record*, patch*);
 #endif
 
 uint64_t asl_randomization = 0;
 
-char *functions[TARGET_FUNCTIONS];
+char* functions[TARGET_FUNCTIONS];
 
 char buffer[LINE_SIZE];
 char prev_line[LINE_SIZE];
 char temp_line[LINE_SIZE]; // this is for RIP-relative instruction management
 
 void (*address)(void) = _instructions;
-instruction_record *instructions;
+instruction_record* instructions;
 int target_instructions = 0;
 
 void (*address1)(void) = _patches;
-patch *patches; // pointer to the memory block where the patch is built
+patch* patches; // pointer to the memory block where the patch is built
 
 uint64_t intermediate_zones[SIZE];
 uint64_t intermediate_flags[SIZE];
 int intermediate_zones_index = -1;
 
-void audit_block(instruction_record *the_record) {
+void audit_block(instruction_record* the_record) {
 #if CKPT
     if (the_record->type == 'l') { // avoid audit of load instruction in ckpt
         return;
@@ -52,10 +52,10 @@ void audit_block(instruction_record *the_record) {
 			destination is %s\n \
 			data size is %d\n \
 			number of instrumentation instructions %d\n",
-           (char *)the_record->function, (void *)the_record->address,
+           (char*)the_record->function, (void*)the_record->address,
            the_record->size, the_record->type, the_record->rip_relative,
-           (void *)the_record->effective_operand_address,
-           the_record->indirect_jump, (void *)the_record->middle_buffer,
+           (void*)the_record->effective_operand_address,
+           the_record->indirect_jump, (void*)the_record->middle_buffer,
            the_record->op, the_record->source, the_record->dest,
            the_record->data_size, the_record->instrumentation_instructions);
     fflush(stdout);
@@ -68,7 +68,7 @@ int fd;
 void build_intermediate_representation(void) {
     int i;
 
-    patches = (patch *)
+    patches = (patch*)
         address1; // always use this reference for accessing the patch area
 
     for (i = 0; i < target_instructions; i++) {
@@ -103,7 +103,7 @@ uint64_t book_intermediate_target(uint64_t instruction_address,
 
 void build_patches(void) {
     unsigned long size;
-    char *jmp_target;
+    char* jmp_target;
     char v[128]; // this hosts the jmp binary
     int i, pos;
     int jmp_displacement, jmp_back_displacement;
@@ -123,7 +123,7 @@ void build_patches(void) {
     size_t save_reg_lea;
 #endif
 
-    patches = (patch *)address1;
+    patches = (patch*)address1;
 
     for (i = 0; i < target_instructions; i++) {
 #if CKPT
@@ -140,20 +140,20 @@ void build_patches(void) {
         size = patches[i].original_instruction_size = instructions[i].size;
 
         // saving the original instruction bytes
-        memcpy((char *)(patches[i].original_instruction_bytes),
-               (char *)(instructions[i].address), size);
+        memcpy((char*)(patches[i].original_instruction_bytes),
+               (char*)(instructions[i].address), size);
 
         patches[i].code = patches[i].block; // you can put wathever instruction
                                             // in the block of the patch
 
 #ifdef ASM_PREAMBLE
         // copy the asm-patch code into the instructions block
-        memcpy((char *)(patches[i].code), (char *)(test_code), test_code_size);
+        memcpy((char*)(patches[i].code), (char*)(test_code), test_code_size);
         // adjust the asm-patch offset for the call to the patch function
-        jmp_target = (char *)the_patch;
+        jmp_target = (char*)the_patch;
         jmp_displacement =
-            (int)((char *)jmp_target -
-                  ((char *)(patches[i].code) +
+            (int)((char*)jmp_target -
+                  ((char*)(patches[i].code) +
                    50)); // this is because we substitute the original call
                          // instruction offset with the one observable after the
                          // asm-patch instructions copy
@@ -166,7 +166,7 @@ void build_patches(void) {
         // memcpy((char*)(patches[i].code) + 36,v,5);
 
         // CAREFULL THIS
-        memcpy((char *)(patches[i].code) + 45, v, 5);
+        memcpy((char*)(patches[i].code) + 45, v, 5);
 
         // adjust the parameter to be passed by the asm-patch to the actual
         // patch
@@ -187,7 +187,7 @@ void build_patches(void) {
         v[pos++] =
             (unsigned char)((unsigned long)&(instructions[i]) >> 56 & 0xff);
 
-        memcpy((char *)(patches[i].code) + 37, v, 8);
+        memcpy((char*)(patches[i].code) + 37, v, 8);
         patches[i].code = patches[i].code + test_code_size;
 #endif
 
@@ -197,12 +197,12 @@ void build_patches(void) {
             patches[i].code + save_reg_lea; // the size of the instructions
                                             // needed to save regs in GS and
                                             // the size of the lea instruction
-        memcpy((char *)(patches[i].code), (char *)(ckpt_code), ckpt_code_size);
+        memcpy((char*)(patches[i].code), (char*)(ckpt_code), ckpt_code_size);
         patches[i].code = patches[i].code + ckpt_code_size;
 #endif
 
         // copy the original memory access instruction to be executed
-        memcpy((char *)(patches[i].code), (char *)(instructions[i].address),
+        memcpy((char*)(patches[i].code), (char*)(instructions[i].address),
                size);
 
 #ifdef CKPT
@@ -221,10 +221,10 @@ void build_patches(void) {
         if (size >= 5) {
             AUDIT
             printf("packing a 5-byte jump for instruction with index %d\n", i);
-            jmp_target = (char *)(patches[i].code);
+            jmp_target = (char*)(patches[i].code);
             jmp_displacement =
-                (int)((char *)jmp_target -
-                      ((char *)(instruction_address) +
+                (int)((char*)jmp_target -
+                      ((char*)(instruction_address) +
                        5)); // this is because we substitute the original
                             // instruction with a 5-byte relative jmp
             AUDIT
@@ -237,27 +237,26 @@ void build_patches(void) {
             v[pos++] = (unsigned char)(jmp_displacement >> 16 & 0xff);
             v[pos++] = (unsigned char)(jmp_displacement >> 24 & 0xff);
             // record the patch to be applied
-            memcpy((char *)(patches[i].jmp_to_post), v, 5);
+            memcpy((char*)(patches[i].jmp_to_post), v, 5);
         } else {
             intermediate_target =
                 book_intermediate_target(instruction_address, size);
             if (intermediate_target == 0x0) {
                 printf("no intermediate target available for the mov "
                        "instruction at runtime address %p index is %d\n",
-                       (void *)instruction_address, i);
+                       (void*)instruction_address, i);
                 fflush(stdout);
                 exit(EXIT_FAILURE);
             } else {
                 AUDIT
                 printf("intermediate target available at address %p for the "
                        "mov instruction at runtime address %p\n",
-                       (void *)intermediate_target,
-                       (void *)instruction_address);
+                       (void*)intermediate_target, (void*)instruction_address);
                 instructions[i].middle_buffer = intermediate_target;
-                jmp_target = (char *)(patches[i].code);
+                jmp_target = (char*)(patches[i].code);
                 jmp_displacement =
-                    (int)((char *)jmp_target -
-                          ((char *)(intermediate_target) +
+                    (int)((char*)jmp_target -
+                          ((char*)(intermediate_target) +
                            5)); // this is because we substite the original
                                 // cli/nop instruction set with a 5-byte
                                 // relative jmp from the intermediate area
@@ -272,21 +271,21 @@ void build_patches(void) {
                 v[pos++] = (unsigned char)(jmp_displacement >> 16 & 0xff);
                 v[pos++] = (unsigned char)(jmp_displacement >> 24 & 0xff);
                 // BUG FIXING WITH THE BELOW MEMCPY
-                memcpy((char *)(patches[i].jmp_to_post), v, 5);
+                memcpy((char*)(patches[i].jmp_to_post), v, 5);
                 patches[i].intermediate_zone_address = intermediate_target;
 
                 // we now prepare the jump to the intermediate zone for this
                 // instruction - this becomes the real block of instructions
                 // substituting the original mov instruction
-                jmp_target = (char *)(intermediate_target);
+                jmp_target = (char*)(intermediate_target);
                 jmp_displacement =
-                    (signed char)((char *)jmp_target -
-                                  ((char *)(instruction_address) +
+                    (signed char)((char*)jmp_target -
+                                  ((char*)(instruction_address) +
                                    2)); // this is because we substite the
                                         // original instrucion with a 2-byte
                                         // relative jmp
                 AUDIT
-                if ((char *)jmp_target < ((char *)(instruction_address) + 2)) {
+                if ((char*)jmp_target < ((char*)(instruction_address) + 2)) {
                     printf("negative intermediate jump displacement for "
                            "instruction %d\n",
                            i);
@@ -294,7 +293,7 @@ void build_patches(void) {
                 pos = 0;
                 v[pos++] = 0xeb;
                 v[pos++] = (unsigned char)(jmp_displacement & 0xff);
-                memcpy((char *)(patches[i].jmp_to_intermediate), v, 2);
+                memcpy((char*)(patches[i].jmp_to_intermediate), v, 2);
             }
         }
 
@@ -317,14 +316,14 @@ void build_patches(void) {
         memcpy(patches[i].code + size, patches[i].functional_instr,
                patches[i].functional_instr_size);
 
-        jmp_target = (char *)(instruction_address) + size;
+        jmp_target = (char*)(instruction_address) + size;
 
         size += patches[i].functional_instr_size;
 
         jmp_back_displacement =
-            (char *)jmp_target - ((char *)(patches[i].code) + size +
-                                  5); // here we go beyond the instruction+jmp -
-                                      // but this is a baseline
+            (char*)jmp_target - ((char*)(patches[i].code) + size +
+                                 5); // here we go beyond the instruction+jmp -
+                                     // but this is a baseline
         AUDIT
         printf("jump back displacement is %d\n", jmp_back_displacement);
         fflush(stdout);
@@ -335,7 +334,7 @@ void build_patches(void) {
         v[pos++] = (unsigned char)(jmp_back_displacement >> 16 & 0xff);
         v[pos++] = (unsigned char)(jmp_back_displacement >> 24 & 0xff);
         // log the jmp-back into the patch area
-        memcpy((char *)(patches[i].code) + size, (char *)v, 5);
+        memcpy((char*)(patches[i].code) + size, (char*)v, 5);
 
         size -= patches[i].functional_instr_size;
 
@@ -350,7 +349,7 @@ void build_patches(void) {
                 effective_operand_address - (uint64_t)(patches[i].code + size);
             AUDIT
             printf("effective operand displacement is %p\n",
-                   (void *)effective_operand_displacement);
+                   (void*)effective_operand_displacement);
 
             patches[i].code[size - 1] =
                 (unsigned char)(effective_operand_displacement >> 24 & 0xff);
@@ -370,6 +369,7 @@ void apply_patches(void) {
     unsigned long size;
     unsigned long instruction_address;
     unsigned long instruction_patch;
+    unsigned short instruction_short_patch;
 
     for (i = 0; i < target_instructions; i++) {
 #if CKPT
@@ -388,7 +388,7 @@ void apply_patches(void) {
                     PROT_READ | PROT_EXEC | PROT_WRITE);
             syscall(10, (instruction_address & mask) + PAGE, PAGE,
                     PROT_READ | PROT_EXEC | PROT_WRITE);
-            memcpy((char *)instruction_address, (char *)instruction_patch, 5);
+            memcpy((char*)instruction_address, (char*)instruction_patch, 5);
             // original permissions need to be restored - TO DO
         } else {
             syscall(10, (instruction_address & mask) - 128, PAGE,
@@ -397,10 +397,10 @@ void apply_patches(void) {
                     PROT_READ | PROT_EXEC | PROT_WRITE);
             syscall(10, (instruction_address & mask) + PAGE, PAGE,
                     PROT_READ | PROT_EXEC | PROT_WRITE);
-            memcpy((char *)instruction_address,
-                   (char *)patches[i].jmp_to_intermediate, 2);
-            memcpy((char *)patches[i].intermediate_zone_address,
-                   (char *)patches[i].jmp_to_post, 5);
+            memcpy((char*)instruction_address,
+                   (char*)patches[i].jmp_to_intermediate, 2);
+            memcpy((char*)patches[i].intermediate_zone_address,
+                   (char*)patches[i].jmp_to_post, 5);
             AUDIT
             printf("patch applied to instruction with index %d - intermediate "
                    "jump required\n",
@@ -412,7 +412,7 @@ void apply_patches(void) {
 // the index returned by this function depends on how CPU registes are
 // saved into the stack area when the memory access patch gets executed
 // this depends on src/_asm_patches.S
-int get_register_index(char *the_register) {
+int get_register_index(char* the_register) {
 
     if (strcmp(the_register, "%rax") == 0) {
         return 11;
@@ -426,9 +426,9 @@ int get_register_index(char *the_register) {
 // this function determines the size of touched data based on the instruction
 // source/destination type is either 'l' or 's' for load/store instructions it
 // is usefull for mov instructions where data size is not explicit
-int operands_check(char *source, char *destination, char type) {
+int operands_check(char* source, char* destination, char type) {
 
-    char *reg = (type == 's') ? source : destination;
+    char* reg = (type == 's') ? source : destination;
     if (!strcmp(reg, "%eax") || !strcmp(reg, "%ebx") || !strcmp(reg, "%ecx") ||
         !strcmp(reg, "%edx") || !strcmp(reg, "%r8d") || !strcmp(reg, "%r9d") ||
         !strcmp(reg, "%r10d") || !strcmp(reg, "%r11d") ||
@@ -461,7 +461,7 @@ int operands_check(char *source, char *destination, char type) {
 
 // this function returns the number of bytes to be touched by a given
 // instruction
-int get_data_size(char *instruction, char *source, char *dest, char type) {
+int get_data_size(char* instruction, char* source, char* dest, char type) {
 
     if (!strcmp(instruction, "movb")) {
         return sizeof(char);
@@ -500,15 +500,15 @@ int get_data_size(char *instruction, char *source, char *dest, char type) {
 // this returns the number of memory move instructions that have been identified
 // for instrumentation - this number is also written to the target_instructions
 // variable
-int elf_parse(char **function_names, char *parsable_elf) {
+int elf_parse(char** function_names, char* parsable_elf) {
     int i;
     int j;
     int k;
     int num_functions;
-    FILE *the_file;
-    char *guard;
-    char *p;
-    char *aux;
+    FILE* the_file;
+    char* guard;
+    char* p;
+    char* aux;
     char category;
     char rip_relative;
     uint64_t function_start_address;
@@ -520,7 +520,7 @@ int elf_parse(char **function_names, char *parsable_elf) {
     int register_index;
     long corrector;
 
-    instructions = (instruction_record *)address;
+    instructions = (instruction_record*)address;
 
     for (i = 0;; i++) { // counting functions to parse
         if (function_names[i] == NULL) {
@@ -569,7 +569,7 @@ int elf_parse(char **function_names, char *parsable_elf) {
                     (unsigned long)strtol(buffer, NULL, 16);
                 AUDIT
                 printf("numerical address of function %s is %p\n",
-                       function_names[i], (void *)function_start_address);
+                       function_names[i], (void*)function_start_address);
 
                 while (1) {
                     memcpy(prev_line, buffer, LINE_SIZE);
@@ -588,7 +588,7 @@ int elf_parse(char **function_names, char *parsable_elf) {
                             (unsigned long)strtol(prev_line, NULL, 16);
                         AUDIT
                         printf("numerical end address of function %s is %p\n",
-                               function_names[i], (void *)function_end_address);
+                               function_names[i], (void*)function_end_address);
                         break;
                     }
                     // now we look at the actual instruction
@@ -644,13 +644,13 @@ int elf_parse(char **function_names, char *parsable_elf) {
                             function_names[i];
                         AUDIT
                         printf("instruction address is %p\n",
-                               (void *)instruction_start_address);
+                               (void*)instruction_start_address);
                         instructions[target_instructions].address =
                             instruction_start_address;
                         // we now simply rewrite 0x0 on the structure that keeps
                         // the targeted memory location information
                         memset(
-                            (char *)&(instructions[target_instructions].target),
+                            (char*)&(instructions[target_instructions].target),
                             0x0, sizeof(target_address));
 
                         p = strtok(NULL, ":\t");
@@ -753,12 +753,12 @@ int elf_parse(char **function_names, char *parsable_elf) {
                             corrector = corrector * (long)rip_displacement;
                             AUDIT
                             printf("rip displacement is %p\n",
-                                   (void *)rip_displacement);
+                                   (void*)rip_displacement);
                             AUDIT
                             printf("displacement value is %ld\n", corrector);
                             instructions[target_instructions]
                                 .effective_operand_address =
-                                (unsigned long)((long)((char *)
+                                (unsigned long)((long)((char*)
                                                            instruction_start_address +
                                                        instruction_len) +
                                                 corrector);
@@ -943,11 +943,12 @@ int elf_parse(char **function_names, char *parsable_elf) {
     return target_instructions;
 }
 
-unsigned long find_elf_parse_compile_time_address(char *parsable_elf) {
+unsigned long find_elf_parse_compile_time_address(char* parsable_elf) {
 
-    FILE *the_file;
-    char *guard;
+    FILE* the_file;
+    char* guard;
     unsigned long function_start_address;
+    long corrector;
 
     AUDIT
     printf("finding elf_parse compile time address\n");
@@ -975,7 +976,7 @@ unsigned long find_elf_parse_compile_time_address(char *parsable_elf) {
             function_start_address = (unsigned long)strtol(buffer, NULL, 16);
             AUDIT
             printf("numerical address of function elf_parse is %p\n",
-                   (void *)function_start_address);
+                   (void*)function_start_address);
             fclose(the_file);
             return function_start_address;
         }
@@ -985,9 +986,11 @@ unsigned long find_elf_parse_compile_time_address(char *parsable_elf) {
     return 0x0;
 }
 
-void find_intermediate_zones(char *parsable_elf) {
-    FILE *the_file;
-    char *guard;
+void find_intermediate_zones(char* parsable_elf) {
+    FILE* the_file;
+    char* guard;
+    unsigned long function_start_address;
+    long corrector;
 
     AUDIT
     printf("finding intermediate zones\n");
@@ -1021,7 +1024,7 @@ void find_intermediate_zones(char *parsable_elf) {
                 asl_randomization;
             AUDIT
             printf("runtime time address of the cli instruction is %p\n",
-                   (void *)intermediate_zones[intermediate_zones_index]);
+                   (void*)intermediate_zones[intermediate_zones_index]);
         }
     }
 
@@ -1029,9 +1032,9 @@ out:
     fclose(the_file);
 }
 
-int __real_main(int, char **);
+int __real_main(int, char**);
 
-int __wrap_main(int argc, char **argv) {
+int __wrap_main(int argc, char** argv) {
     int ret;
     int i;
     // char *command;
@@ -1040,15 +1043,14 @@ int __wrap_main(int argc, char **argv) {
 
     asl_randomization = (unsigned long)elf_parse;
     AUDIT
-    printf("runtime address of elf_parse is %p\n",
-           (void *)(uintptr_t)elf_parse);
+    printf("runtime address of elf_parse is %p\n", (void*)(uintptr_t)elf_parse);
     asl_randomization =
         (unsigned long)((long)asl_randomization -
                         (long)find_elf_parse_compile_time_address(
                             disassembly_file));
     AUDIT
     printf("asl randomization is set to the value %p\n",
-           (void *)asl_randomization);
+           (void*)asl_randomization);
     fflush(stdout);
 
     i = 0;

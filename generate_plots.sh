@@ -14,14 +14,14 @@ PLOT_REP_COMPARE="plot_rep_comparison.gp"
 rm -r plots
 mkdir plots
 mkdir plots/ckpt_comparison
-mkdir plots/ckpt_comparison/cf_disabled
-mkdir plots/ckpt_comparison/cf_enabled
+mkdir plots/ckpt_comparison/ckpt
+mkdir plots/ckpt_comparison/restore
 mkdir plots/mod_comparison
-mkdir plots/mod_comparison/cf_disabled
-mkdir plots/mod_comparison/cf_enabled
+mkdir plots/mod_comparison/ckpt
+mkdir plots/mod_comparison/restore
 mkdir plots/rep_comparison
-mkdir plots/rep_comparison/cf_disabled
-mkdir plots/rep_comparison/cf_enabled
+mkdir plots/rep_comparison/ckpt
+mkdir plots/rep_comparison/restore
 
 # --- Error Checking ---
 if ! command -v gnuplot &> /dev/null

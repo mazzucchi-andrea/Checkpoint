@@ -20,7 +20,7 @@ int main() {
 
     // Parse the input string and convert hexadecimal bytes into actual binary
     // values
-    char *ptr = input;
+    char* ptr = input;
     while (sscanf(ptr, "%2x", &value) ==
            1) { // Read two characters as a hex byte
         instruction[byteCount++] =

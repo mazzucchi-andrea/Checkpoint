@@ -1,16 +1,15 @@
 Per effetuare i test è sufficente l'esecuzione di:
-    test.sh
+    sh test.sh
 
-Il test effettua un numero di operazioni pari a 1000, 10000, 1000000, 1000000 con rapporto scritture/letture da 95%/5% a 30%/70%. Il test verrà ripetuto 128 volte per ottenere una media del tempo di esecuzione. Questo verrà fatto effetuando, o meno, una pulizia della cache prima di ogni ripetizione.
-Nel caso di MVM_CKPT il test viene ripetuto per le tre modalità di checkpointing (64,128,256) e per tre tagli di memmoria 1MB, 2MB, 4MB.
-In MVM e MVM_CKPT è stato inibito il sistema di patch per le operazioni di load.
-Inoltre sono state rimosse tutte le operazione di AUDIT.
+Il test effettua un numero di operazioni pari a 1000, 10000, 1000000, 1000000 con rapporto scritture/letture da 95%/5% a 30%/70%. 
+Il test verrà ripetuto 50 volte per ottenere una media del tempo di esecuzione eun intervallo di confidenza del 95%. 
+Il test verrà eseguito effetuando, o meno, un'operazione di cache flush su tutta la memoria utilizzata prima delle scritture/letture e prima delle operazioni di restore.
+Nel caso di MVM_CKPT il test viene ripetuto per le quattro modalità di checkpointing (8,16,32,64 byte) e per tre tagli di memmoria 1MB, 2MB, 4MB.
+Stessa cosa per MVM che ripete le stesse operazione, ma si basa su una patch C.
+SIMPLE_CKPT, effettua una memcpy dell'area di memoria prima delle scritture/letture e una memcpy come operazione di restore.
 
 Lo script effettuerà le segeunti operazioni:
-- esecuzione di MVM, con la patch presente in https://github.com/FrancescoQuaglia/MVM;
-- esecuzione di MVM_CKPT;
-- esecuzione di SIMPLE_CKPT, checkpoint che utilizza memcpy;
-- creazione di un virtual environment di Python;
-- attivazione del venv;
-- installazione dei requisiti necessari a generari i grafici;
-- esecuzioni di graphs.py con generazioni dei grafici nella directory graphs
+- esecuzione dei test per MVM_CKPT (https://github.com/mazzucchi-andrea/MVM/tree/GRID_CKPT_BS);
+- esecuzione dei test per MVM, con pacth C (https://github.com/mazzucchi-andrea/MVM/tree/GRID_CKPT_BS_C_Patch);
+- esecuzione dei test per SIMPLE_CKPT, checkpoint che utilizza memcpy;
+- creazioni dei grafici tramite gnuplot.

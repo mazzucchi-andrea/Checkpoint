@@ -42,30 +42,29 @@ void the_patch(unsigned long, unsigned long) __attribute__((used));
 // the pointers to the instruction metadata and CPU snapshot
 
 void the_patch(unsigned long mem, unsigned long regs) {
-    instruction_record *instruction = (instruction_record *)mem;
-    target_address *target;
+    instruction_record* instruction = (instruction_record*)mem;
+    target_address* target;
     unsigned long A = 0, B = 0;
     uint8_t *address, *base, *bitmap;
     uint8_t bit, byte_bitmask;
     uint16_t word_bitmask, word;
-    uint16_t *word_ptr;
+    uint16_t* word_ptr;
     uint64_t offset, temp;
 
     // get the address
     if (instruction->effective_operand_address != 0x0) {
-        address = (uint8_t *)instruction->effective_operand_address;
+        address = (uint8_t*)instruction->effective_operand_address;
     } else {
         target = &(instruction->target);
-        memcpy((char *)&A, (char *)(regs + 8 * (target->base_index - 1)), 8);
+        memcpy((char*)&A, (char*)(regs + 8 * (target->base_index - 1)), 8);
         if (target->scale_index) {
-            memcpy((char *)&B, (char *)(regs + 8 * (target->scale_index - 1)),
-                   8);
+            memcpy((char*)&B, (char*)(regs + 8 * (target->scale_index - 1)), 8);
         }
-        address = (uint8_t *)((long)target->displacement + (long)A +
-                              (long)((long)B * (long)target->scale));
+        address = (uint8_t*)((long)target->displacement + (long)A +
+                             (long)((long)B * (long)target->scale));
     }
 
-    base = (uint8_t *)((uint64_t)address & (~(ALLOCATOR_AREA_SIZE - 1)));
+    base = (uint8_t*)((uint64_t)address & (~(ALLOCATOR_AREA_SIZE - 1)));
     bitmap = base + 2 * ALLOCATOR_AREA_SIZE;
     offset = (uint64_t)address & (ALLOCATOR_AREA_SIZE - 1);
     if ((uint64_t)address & (MOD - 1)) {
@@ -75,7 +74,7 @@ void the_patch(unsigned long mem, unsigned long regs) {
         bit = temp & 7;
         temp = temp >> 3;
         word_bitmask = 3 << bit;
-        *(uint16_t *)(bitmap + temp) |= word_bitmask;
+        *(uint16_t*)(bitmap + temp) |= word_bitmask;
         return;
     }
 
@@ -84,7 +83,7 @@ void the_patch(unsigned long mem, unsigned long regs) {
     bit = temp & 7;
     temp = temp >> 3;
     byte_bitmask = 1 << bit;
-    *(uint8_t *)(bitmap + temp) |= byte_bitmask;
+    *(uint8_t*)(bitmap + temp) |= byte_bitmask;
 }
 
 // used_defined(...) is the real body of the user-defined instrumentation
@@ -106,6 +105,6 @@ char buffer[1024];
 // this function with no management of the pointed areas menas that you are
 // skipping the instrumentatn of this instruction
 
-void user_defined(instruction_record *actual_instruction, patch *actual_patch) {
+void user_defined(instruction_record* actual_instruction, patch* actual_patch) {
     // not used in this patch
 }

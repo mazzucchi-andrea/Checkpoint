@@ -1,6 +1,6 @@
 #include <emmintrin.h> // SSE2
 #include <errno.h>
-#include <immintrin.h> // AVX
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,6 +8,14 @@
 #include <time.h>
 
 #include "ckpt_setup.h"
+
+#ifndef MOD
+#define MOD 8
+#endif
+
+#ifndef ALLOCATOR_AREA_SIZE
+#define ALLOCATOR_AREA_SIZE 0x100000
+#endif
 
 #ifndef WRITES
 #define WRITES 950
@@ -21,7 +29,7 @@
 #define CF 0
 #endif
 
-double test_checkpoint(uint8_t *area, int64_t value) {
+double test_checkpoint(uint8_t* area, int64_t value) {
     int offset;
     __attribute__((unused)) int64_t read_value;
     clock_t begin, end;
@@ -31,13 +39,13 @@ double test_checkpoint(uint8_t *area, int64_t value) {
     offset = 0;
     for (int i = 0; i < WRITES; i++) {
         offset %= (ALLOCATOR_AREA_SIZE - 8);
-        *(int64_t *)(area + offset) = value;
+        *(int64_t*)(area + offset) = value;
         offset += 4;
     }
     offset = 0;
     for (int i = 0; i < READS; i++) {
         offset %= (ALLOCATOR_AREA_SIZE - 8);
-        read_value = *(int64_t *)(area + offset);
+        read_value = *(int64_t*)(area + offset);
         offset += 4;
     }
     end = clock();
@@ -45,7 +53,7 @@ double test_checkpoint(uint8_t *area, int64_t value) {
     return (double)(end - begin) / CLOCKS_PER_SEC;
 }
 
-double test_checkpoint_repeat(uint8_t *area, int64_t value, int rep) {
+double test_checkpoint_repeat(uint8_t* area, int64_t value, int rep) {
     int offset;
     __attribute__((unused)) int64_t read_value;
     clock_t begin, end;
@@ -56,13 +64,13 @@ double test_checkpoint_repeat(uint8_t *area, int64_t value, int rep) {
         offset = 0;
         for (int i = 0; i < WRITES; i++) {
             offset %= (ALLOCATOR_AREA_SIZE - 8);
-            *(int64_t *)(area + offset) = value;
+            *(int64_t*)(area + offset) = value;
             offset += 4;
         }
         offset = 0;
         for (int i = 0; i < READS; i++) {
             offset %= (ALLOCATOR_AREA_SIZE - 8);
-            read_value = *(int64_t *)(area + offset);
+            read_value = *(int64_t*)(area + offset);
             offset += 4;
         }
     }
@@ -71,22 +79,46 @@ double test_checkpoint_repeat(uint8_t *area, int64_t value, int rep) {
     return (double)(end - begin) / CLOCKS_PER_SEC;
 }
 
-void clean_cache(uint8_t *area) {
+void clean_cache(uint8_t* area) {
     int cache_line_size = __builtin_cpu_supports("sse2") ? 64 : 32;
     for (int i = 0; i < (2 * ALLOCATOR_AREA_SIZE + BITMAP_SIZE);
          i += (cache_line_size / 8)) {
-        _mm_clflush(area + i);
+        _mm_clflush((void*)(area + i));
     }
 }
 
+void mean_ci_95(double* samples, double* mean, double* ci) {
+    double sum = 0.0;
+    for (int i = 0; i < 50; i++) {
+
+        sum += samples[i];
+    }
+    *mean = sum / 50;
+
+    double var = 0.0;
+    for (int i = 0; i < 50; i++) {
+
+        double d = samples[i] - *mean;
+        var += d * d;
+    }
+
+    double sd = sqrt(var / (50 - 1)); // sample SD
+    double sem = sd / sqrt(50);       // standard error
+
+    const double t95 = 2.009;
+
+    *ci = t95 * sem;
+}
+
 int main(void) {
-    int64_t value;
+    double ckpt_samples[50], restore_samples[50];
+    double ckpt_mean, ckpt_ci, restore_mean, restore_ci;
     unsigned long base_addr;
-    size_t size;
-    uint8_t *area;
-    double wr_time, restore_time;
     clock_t begin, end;
-    FILE *file;
+    uint8_t* area;
+    int64_t value;
+    size_t size;
+    FILE* file;
 
     _tls_setup();
 
@@ -94,64 +126,67 @@ int main(void) {
     value = rand() % INT64_MAX;
 
     base_addr = 8UL * 1024UL * ALLOCATOR_AREA_SIZE;
-    size = 2UL * ALLOCATOR_AREA_SIZE + BITMAP_SIZE;
-    area = (uint8_t *)mmap((void *)base_addr, size, PROT_READ | PROT_WRITE,
-                           MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED, -1, 0);
+    size = 2 * ALLOCATOR_AREA_SIZE + BITMAP_SIZE;
+    area = (uint8_t*)mmap((void*)base_addr, size, PROT_READ | PROT_WRITE,
+                          MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED_NOREPLACE, -1,
+                          0);
     if (area == MAP_FAILED) {
         perror("mmap failed");
         return errno;
     }
 
-    wr_time = 0.0;
-    restore_time = 0.0;
-    for (int i = 0; i < 128; i++) {
+    for (int i = 0; i < 50; i++) {
 #if CF == 1
         clean_cache(area);
 #endif
-        wr_time += test_checkpoint(area, value);
+        ckpt_samples[i] = test_checkpoint(area, value);
 #if CF == 1
         clean_cache(area);
 #endif
         begin = clock();
         _restore_area(area);
         end = clock();
-        restore_time += (double)(end - begin) / CLOCKS_PER_SEC;
+        restore_samples[i] = (double)(end - begin) / CLOCKS_PER_SEC;
     }
 
     file = fopen("ckpt_test_results.csv", "a");
     if (file == NULL) {
-        fprintf(stderr, "Error opening file!\n");
-        return EXIT_FAILURE;
+
+        fprintf(stderr, "Error opening ckpt_test_results.csv\n");
+        return errno;
     }
-    fprintf(file, "0x%x,%d,%d,%d,%d,%d,%f,%f\n", ALLOCATOR_AREA_SIZE, CF, MOD,
-            WRITES + READS, WRITES, READS, wr_time / 128, restore_time / 128);
+    mean_ci_95(ckpt_samples, &ckpt_mean, &ckpt_ci);
+    mean_ci_95(restore_samples, &restore_mean, &restore_ci);
+    fprintf(file, "0x%x,%d,%d,%d,%d,%d,%.20f,%.20f,%.20f,%.20f\n",
+            ALLOCATOR_AREA_SIZE, CF, MOD, WRITES + READS, WRITES, READS,
+            ckpt_mean, ckpt_ci, restore_mean, restore_ci);
     fclose(file);
 
     file = fopen("ckpt_repeat_test_results.csv", "a");
     if (file == NULL) {
-        fprintf(stderr, "Error opening file!\n");
-        return EXIT_FAILURE;
+        fprintf(stderr, "Error opening ckpt_repeat_test_results.csv\n");
+        return errno;
     }
 
     for (int r = 2; r <= 10; r += 2) {
-        wr_time = 0.0;
-        restore_time = 0.0;
-        for (int i = 0; i < 128; i++) {
+        for (int i = 0; i < 50; i++) {
 #if CF == 1
             clean_cache(area);
 #endif
-            wr_time += test_checkpoint_repeat(area, value, r);
+            ckpt_samples[i] = test_checkpoint_repeat(area, value, r);
 #if CF == 1
             clean_cache(area);
 #endif
             begin = clock();
             _restore_area(area);
             end = clock();
-            restore_time += (double)(end - begin) / CLOCKS_PER_SEC;
+            restore_samples[i] = (double)(end - begin) / CLOCKS_PER_SEC;
         }
-        fprintf(file, "0x%x,%d,%d,%d,%d,%d,%d,%f,%f\n", ALLOCATOR_AREA_SIZE, CF,
-                MOD, WRITES + READS, WRITES, READS, r, wr_time / 128,
-                restore_time / 128);
+        mean_ci_95(ckpt_samples, &ckpt_mean, &ckpt_ci);
+        mean_ci_95(restore_samples, &restore_mean, &restore_ci);
+        fprintf(file, "0x%x,%d,%d,%d,%d,%d,%d,%.20f,%.20f,%.20f,%.20f\n",
+                ALLOCATOR_AREA_SIZE, CF, MOD, WRITES + READS, WRITES, READS, r,
+                ckpt_mean, ckpt_ci, restore_mean, restore_ci);
     }
     fclose(file);
 

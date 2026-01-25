@@ -3,6 +3,6 @@
 
 #include "ckpt.h"
 
-void set_ckpt(uint8_t *area) { memcpy(area + SIZE, area, SIZE); }
+void set_ckpt(uint8_t* area) { memcpy(area + SIZE, area, SIZE); }
 
-void restore_area(uint8_t *area) { memcpy(area, area + SIZE, SIZE); }
+void restore_area(uint8_t* area) { memcpy(area, area + SIZE, SIZE); }

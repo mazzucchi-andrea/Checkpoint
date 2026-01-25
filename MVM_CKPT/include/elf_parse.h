@@ -23,7 +23,7 @@ typedef struct _target_address {
 
 typedef struct _instruction_record {
     int record_index;
-    char *function; // the function the instruction belongs to
+    char* function; // the function the instruction belongs to
     uint64_t address;
     unsigned long size;
     char indirect_jump;     //'y' or 'n' - this must be 'y' for any instruction
@@ -63,7 +63,7 @@ typedef struct _patch {
         [CODE_BLOCK]; // this is the actual patch - it must terminate with a jmp
                       // to
                       // original_instruction_address+original_instruction_size
-    char *code;
+    char* code;
     uint64_t intermediate_zone_address;
     char jmp_to_intermediate[2]; // the size is fixed to 2 bytes - it is a
                                  // relative jump to a 8-bit relative offset

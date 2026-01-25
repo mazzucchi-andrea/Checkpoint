@@ -6,12 +6,20 @@ declare -a size=(0x100000 0x200000 0x400000)
 declare -a mods=(8 16 32 64)
 declare -a writes=(0.95 0.90 0.85 0.80 0.75 0.70 0.65 0.60 0.55 0.50 0.45 0.40 0.35 0.30)
 
+# --- Error Checking ---
+if ! command -v bc &> /dev/null
+then
+    echo "Error: bc could not be found."
+    echo "Please install bc to run this script."
+    exit 1
+fi
+
 # Tests with MVM_CKPT
 cd MVM_CKPT
 rm ckpt_test_results.csv
 rm ckpt_repeat_test_results.csv
-echo "size,cache_flush,mod,ops,writes,reads,ckpt_time,restore_time" > ckpt_test_results.csv
-echo "size,cache_flush,mod,ops,writes,reads,repetitions,ckpt_time,restore_time" > ckpt_repeat_test_results.csv
+echo "size,cache_flush,mod,ops,writes,reads,ckpt_time,ckpt_ci,restore_time,restore_ci" > ckpt_test_results.csv
+echo "size,cache_flush,mod,ops,writes,reads,repetitions,ckpt_time,ckpt_ci,restore_time,restore_ci" > ckpt_repeat_test_results.csv
 
 for mod in ${mods[@]};
 do
@@ -41,8 +49,8 @@ cd ..
 cd MVM
 rm mvm_test_results.csv
 rm mvm_repeat_test_results.csv
-echo "size,cache_flush,mod,ops,writes,reads,ckpt_time,restore_time" > mvm_test_results.csv
-echo "size,cache_flush,mod,ops,writes,reads,repetitions,ckpt_time,restore_time" > mvm_repeat_test_results.csv
+echo "size,cache_flush,mod,ops,writes,reads,ckpt_time,ckpt_ci,restore_time,restore_ci" > mvm_test_results.csv
+echo "size,cache_flush,mod,ops,writes,reads,repetitions,ckpt_time,ckpt_ci,restore_time,restore_ci" > mvm_repeat_test_results.csv
 
 for mod in ${mods[@]};
 do
@@ -72,8 +80,8 @@ cd ..
 cd SIMPLE_CKPT
 rm simple_ckpt_test_results.csv
 rm simple_ckpt_repeat_test_results.csv
-echo "size,cache_flush,ops,writes,reads,simple_ckpt_time,simple_restore_time" > simple_ckpt_test_results.csv
-echo "size,cache_flush,ops,writes,reads,repetitions,ckpt_time,restore_time" > simple_ckpt_repeat_test_results.csv
+echo "size,cache_flush,ops,writes,reads,ckpt_time,ckpt_ci,restore_time,restore_ci" > simple_ckpt_test_results.csv
+echo "size,cache_flush,ops,writes,reads,repetitions,ckpt_time,ckpt_ci,restore_time,restore_ci" > simple_ckpt_repeat_test_results.csv
 
 for s in ${size[@]};
 do
