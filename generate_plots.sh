@@ -54,7 +54,7 @@ echo "Found $PLOT_MOD_COMPARE."
 echo "Found $PLOT_REP_COMPARE."
 echo "Generating plots for all unique combinations..."
 
-gcc get_ckpt_data.c -o get_plot_data
+gcc -O3 get_ckpt_data.c -o get_plot_data
 
 for mod in ${mods[@]};
 do
@@ -74,7 +74,7 @@ done
 echo "All ckpt comparison plots generated."
 
 
-gcc get_mod_data.c -o get_plot_data
+gcc -O3 get_mod_data.c -o get_plot_data
 
 
 for s in ${size[@]};
@@ -92,7 +92,7 @@ done
 echo "All mod comparison plots generated."
 
 
-gcc get_rep_data.c -o get_plot_data
+gcc -O3 get_rep_data.c -o get_plot_data
 
 for r in ${reps[@]};
 do

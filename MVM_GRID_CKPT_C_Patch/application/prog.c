@@ -166,7 +166,6 @@ int main(void) {
         fprintf(stderr, "Error opening mvm_repeat_test_results.csv\n");
         return errno;
     }
-
     for (int r = 2; r <= 10; r += 2) {
         for (int i = 0; i < 50; i++) {
 #if CF == 1

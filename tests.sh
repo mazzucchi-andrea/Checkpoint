@@ -14,8 +14,8 @@ then
     exit 1
 fi
 
-# Tests with MVM_CKPT
-cd MVM_CKPT
+# Tests with MVM_GRID_CKPT
+cd MVM_GRID_CKPT
 rm ckpt_test_results.csv
 rm ckpt_repeat_test_results.csv
 echo "size,cache_flush,mod,ops,writes,reads,ckpt_time,ckpt_ci,restore_time,restore_ci" > ckpt_test_results.csv
@@ -45,8 +45,8 @@ done
 make clean
 cd ..
 
-# Tests with MVM ckpt patch
-cd MVM
+# Tests with MVM_GRID_CKPT_C_Patch ckpt patch
+cd MVM_GRID_CKPT_C_Patch
 rm mvm_test_results.csv
 rm mvm_repeat_test_results.csv
 echo "size,cache_flush,mod,ops,writes,reads,ckpt_time,ckpt_ci,restore_time,restore_ci" > mvm_test_results.csv

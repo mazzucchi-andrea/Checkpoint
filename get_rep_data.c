@@ -90,8 +90,8 @@ int main(int argc, char* argv[]) {
     printf("Generate plot data for 0x%x, %d, %d, %d, %d\n", size, cache_flush,
            mod, ops, reps);
 
-    ckpt_file = fopen("MVM_CKPT/ckpt_repeat_test_results.csv", "r");
-    mvm_file = fopen("MVM/mvm_repeat_test_results.csv", "r");
+    ckpt_file = fopen("MVM_GRID_CKPT/ckpt_repeat_test_results.csv", "r");
+    mvm_file = fopen("MVM_GRID_CKPT_C_Patch/mvm_repeat_test_results.csv", "r");
     simple_ckpt_file =
         fopen("SIMPLE_CKPT/simple_ckpt_repeat_test_results.csv", "r");
     output_file = fopen("plot_data.csv", "w");
