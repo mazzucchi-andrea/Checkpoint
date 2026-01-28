@@ -17,10 +17,10 @@ typedef struct {
     char restore_ci[32];
 } CkptRow;
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
     FILE *ckpt_file, *output_file;
     char line[MAX_LINE_LENGTH];
-    char* endptr;
+    char *endptr;
     int size, cache_flush, ops;
 
     if (argc < 4) {
@@ -48,7 +48,7 @@ int main(int argc, char* argv[]) {
 
     printf("Generate plot data for 0x%x, %d, %d\n", size, cache_flush, ops);
 
-    ckpt_file = fopen("MVM_CKPT/ckpt_test_results.csv", "r");
+    ckpt_file = fopen("MVM_GRID_CKPT_BS/ckpt_test_results.csv", "r");
     output_file = fopen("plot_data.csv", "w");
 
     if (!ckpt_file || !output_file) {

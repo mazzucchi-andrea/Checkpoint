@@ -7,6 +7,3 @@ IndentWidth: 4
 ColumnLimit: 80
 
 InsertBraces: true
-
-PointerAlignment: Left
-DerivePointerAlignment: false

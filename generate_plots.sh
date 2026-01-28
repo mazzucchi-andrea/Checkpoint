@@ -1,9 +1,10 @@
 #!/bin/bash
 
-declare -a cache_flush=(0)
-declare -a ops=(1000)
-declare -a size=(0x100000)
+declare -a cache_flush=(0 1)
+declare -a ops=(1000 10000 100000 1000000)
+declare -a size=(0x100000 0x200000 0x400000)
 declare -a mods=(8 16 32 64)
+declare -a chunks=(32 64 128 256 512 1024 2048 4096)
 declare -a reps=(2 4 6 8 10)
 
 DATAFILE="plot_data.csv"
@@ -54,18 +55,21 @@ echo "Found $PLOT_MOD_COMPARE."
 echo "Found $PLOT_REP_COMPARE."
 echo "Generating plots for all unique combinations..."
 
-gcc get_ckpt_data.c -o get_plot_data
+gcc -O3 get_ckpt_data.c -o get_plot_data
 
-for mod in ${mods[@]};
+for chunk in ${chunks[@]}
 do
-    for s in ${size[@]};
+    for mod in ${mods[@]};
     do
-        for cf in ${cache_flush[@]};
+        for s in ${size[@]};
         do
-            for o in ${ops[@]}; 
+            for cf in ${cache_flush[@]};
             do
-                ./get_plot_data $s $cf $mod $o
-                gnuplot $PLOT_CKPT_COMPARE
+                for o in ${ops[@]}; 
+                do
+                    ./get_plot_data $s $cf $mod $chunk $o 
+                    gnuplot $PLOT_CKPT_COMPARE
+                done
             done
         done
     done
@@ -74,7 +78,7 @@ done
 echo "All ckpt comparison plots generated."
 
 
-gcc get_mod_data.c -o get_plot_data
+gcc -O3 get_mod_data.c -o get_plot_data
 
 
 for s in ${size[@]};
@@ -92,20 +96,23 @@ done
 echo "All mod comparison plots generated."
 
 
-gcc get_rep_data.c -o get_plot_data
+gcc -O3 get_rep_data.c -o get_plot_data
 
 for r in ${reps[@]};
 do
-    for mod in ${mods[@]};
+    for chunk in ${chunks[@]}
     do
-        for s in ${size[@]};
+        for mod in ${mods[@]};
         do
-            for cf in ${cache_flush[@]};
+            for s in ${size[@]};
             do
-                for o in ${ops[@]}; 
+                for cf in ${cache_flush[@]};
                 do
-                    ./get_plot_data $s $cf $mod $o $r
-                    gnuplot $PLOT_REP_COMPARE
+                    for o in ${ops[@]}; 
+                    do
+                        ./get_plot_data $s $cf $mod $chunk $o $r
+                        gnuplot $PLOT_REP_COMPARE
+                    done
                 done
             done
         done
@@ -113,7 +120,6 @@ do
 done
 
 echo "All rep comparison plots generated."
-
 
 rm get_plot_data
 rm plot_data.csv
